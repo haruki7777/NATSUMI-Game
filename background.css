@@ -1,0 +1,2 @@
+:root{--natsumi-bg:url('data:image/webp;base64,UklGRkoAAABXRUJQVlA4ID4AAADwAgCdASoQABAAPzm0ul0upKKioqIhKAuoAakOlqK7AD+2kAA=')}
+.hero-card{position:relative;overflow:hidden;background-image:linear-gradient(90deg,rgba(9,6,17,.92),rgba(9,6,17,.62),rgba(9,6,17,.18)),var(--natsumi-bg);background-size:cover;background-position:center}.hero-card .sub,.hero-card h1,.hero-card .eyebrow,.hero-card .quick-form,.hero-card .mascot-card{position:relative}.hero-card .mascot-card{background:rgba(9,6,17,.34);border-radius:28px;padding:24px}.supporter-glow:before{pointer-events:none}
