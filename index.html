@@ -7,24 +7,30 @@
   <link rel="stylesheet" href="./style.css" />
   <link rel="stylesheet" href="./background.css" />
   <link rel="stylesheet" href="./game-enhance.css" />
+  <link rel="stylesheet" href="./drawer-menu.css" />
 </head>
 <body>
   <div class="bg-orb orb-a"></div><div class="bg-orb orb-b"></div>
+  <div id="menuBackdrop" class="menu-backdrop"></div>
   <header class="topbar">
     <a class="brand" href="#home"><span class="fox-gif">🦊</span><b>NATSUMI Arcade</b></a>
-    <nav class="nav-menu">
-      <button data-view="profile" class="nav-btn active">프로필</button>
-      <button data-view="games" class="nav-btn">게임</button>
-      <button data-view="shop" class="nav-btn">상점</button>
-      <button data-view="support" class="nav-btn">후원</button>
-      <button data-view="rank" class="nav-btn">랭크카드</button>
-    </nav>
-    <div class="login-box">
-      <button id="bgmBtn" class="ghost" type="button">🎵 BGM 켜기</button>
-      <span id="loginName">게스트 모드</span>
-      <a id="loginBtn" class="primary-link" href="/auth/discord">Discord 로그인</a>
-      <button id="logoutBtn" class="ghost hidden">로그아웃</button>
-    </div>
+    <button id="menuToggle" class="hamburger" type="button" aria-label="메뉴 열기" aria-expanded="false">☰</button>
+    <aside id="drawerMenu" class="drawer-menu" aria-hidden="true">
+      <div class="drawer-head"><b>🦊 메뉴</b><button id="menuClose" class="ghost" type="button">닫기</button></div>
+      <nav class="nav-menu">
+        <button data-view="profile" class="nav-btn active">프로필</button>
+        <button data-view="games" class="nav-btn">게임</button>
+        <button data-view="shop" class="nav-btn">상점</button>
+        <button data-view="support" class="nav-btn">후원</button>
+        <button data-view="rank" class="nav-btn">랭크카드</button>
+      </nav>
+      <div class="login-box">
+        <button id="bgmBtn" class="ghost" type="button">🎵 BGM 켜기</button>
+        <span id="loginName">게스트 모드</span>
+        <a id="loginBtn" class="primary-link" href="/auth/discord">Discord 로그인</a>
+        <button id="logoutBtn" class="ghost hidden">로그아웃</button>
+      </div>
+    </aside>
   </header>
 
   <main id="home" class="layout">
@@ -83,6 +89,6 @@
   </main>
 
   <a id="donateLink" class="float-donate hidden" target="_blank" rel="noreferrer">💖 후원하기</a>
-  <script src="./config.js"></script><script src="./script.js"></script><script src="./extras.js"></script><script src="./interactive-games.js"></script>
+  <script src="./config.js"></script><script src="./script.js"></script><script src="./extras.js"></script><script src="./interactive-games.js"></script><script src="./drawer-menu.js"></script>
 </body>
 </html>
