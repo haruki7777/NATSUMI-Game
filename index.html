@@ -5,6 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>NATSUMI Game Arcade</title>
   <link rel="stylesheet" href="./style.css" />
+  <link rel="stylesheet" href="./background.css" />
 </head>
 <body>
   <div class="bg-orb orb-a"></div><div class="bg-orb orb-b"></div>
@@ -30,22 +31,20 @@
       <div>
         <p class="eyebrow">FOX GAME PORTAL</p>
         <h1>나츠미 게임센터에 온 걸 환영해.</h1>
-        <p class="sub">디스코드 로그인 한 번으로 출석, 금전, 랭크, 칭호, 뱃지, 게임 상점까지 한 화면에서 볼 수 있어. 후원자는 전용 프로필 효과와 뱃지까지 쓸 수 있어. 딱히 널 위해 만든 건 아니니까!</p>
+        <p class="sub">디스코드 로그인만 하면 출석, 금전, 랭크, 칭호, 뱃지, 게임 상점까지 한 화면에서 볼 수 있어. 후원자는 전용 프로필 효과와 뱃지까지 쓸 수 있어.</p>
         <div class="quick-form">
-          <input id="guildId" placeholder="서버 ID / Guild ID" />
-          <input id="userId" placeholder="디스코드 유저 ID" />
-          <button id="loadBtn">프로필 불러오기</button>
+          <button id="loadBtn">내 프로필 불러오기</button>
         </div>
       </div>
       <div class="mascot-card supporter-glow">
         <div class="mascot">🦊</div>
-        <div class="speech">BGM이랑 후원자 효과까지 챙겼어. 흥.</div>
+        <div class="speech">로그인만 하면 내가 알아서 찾아줄게. 흥.</div>
       </div>
     </section>
 
     <section id="profileView" class="view active-view">
       <div class="section-head"><p class="eyebrow">PROFILE</p><h2>내 게임 프로필</h2></div>
-      <div id="profileArea" class="empty">Discord 로그인하거나 유저 ID를 넣어줘.</div>
+      <div id="profileArea" class="empty">Discord 로그인 후 내 프로필 불러오기를 눌러줘.</div>
     </section>
 
     <section id="gamesView" class="view">
@@ -74,25 +73,14 @@
         <article class="support-card supporter-glow">
           <h3>💖 후원자 전용 기능</h3>
           <p>후원 인증이 완료되면 사이트와 랭크카드에서 특별 표시를 사용할 수 있어.</p>
-          <ul>
-            <li>후원자 전용 프로필 프레임</li>
-            <li>후원자 전용 뱃지와 칭호</li>
-            <li>랭크카드 하단 후원자 표시</li>
-            <li>프로필 반짝임 효과</li>
-            <li>후원자 전용 상점 아이템</li>
-          </ul>
+          <ul><li>후원자 전용 프로필 프레임</li><li>후원자 전용 뱃지와 칭호</li><li>랭크카드 하단 후원자 표시</li><li>프로필 반짝임 효과</li><li>후원자 전용 상점 아이템</li></ul>
         </article>
         <article class="support-card">
           <h3>🧾 후원 인증 안내</h3>
           <p>후원은 아래 카카오페이 링크 또는 계좌로 받을 수 있어. 입금 후 인증 신청을 남기면 운영자가 확인해서 후원자 효과를 지급하는 방식이야.</p>
           <p><b>계좌:</b> 카카오페이증권 020-01-671227</p>
           <p><a class="primary-link" href="https://qr.kakaopay.com/Fa7OA44AL" target="_blank" rel="noreferrer">카카오페이 송금 열기</a></p>
-          <div class="support-form">
-            <input id="supportName" placeholder="입금자명 또는 후원 닉네임" />
-            <input id="supportAmount" type="number" placeholder="후원 금액" />
-            <textarea id="supportMemo" placeholder="남길 메시지"></textarea>
-            <button id="supportApplyBtn">후원 인증 신청</button>
-          </div>
+          <div class="support-form"><input id="supportName" placeholder="입금자명 또는 후원 닉네임" /><input id="supportAmount" type="number" placeholder="후원 금액" /><textarea id="supportMemo" placeholder="남길 메시지"></textarea><button id="supportApplyBtn">후원 인증 신청</button></div>
           <div id="supportResult" class="result-box">신청 내용은 운영자가 확인 후 후원자 효과를 지급하는 방식으로 쓰면 돼.</div>
         </article>
       </div>
@@ -100,16 +88,11 @@
 
     <section id="rankView" class="view">
       <div class="section-head"><p class="eyebrow">RANK CARD</p><h2>웹 랭크카드</h2></div>
-      <div class="rank-preview">
-        <p>백엔드 API가 연결되어 있으면 랭크카드를 새 창에서 볼 수 있어.</p>
-        <a id="rankCardLink" class="primary-link" href="#profile" target="_blank">랭크카드 열기</a>
-      </div>
+      <div class="rank-preview"><p>백엔드 API가 연결되어 있으면 랭크카드를 새 창에서 볼 수 있어.</p><a id="rankCardLink" class="primary-link" href="#profile" target="_blank">랭크카드 열기</a></div>
     </section>
   </main>
 
   <a id="donateLink" class="float-donate hidden" target="_blank" rel="noreferrer">💖 후원하기</a>
-  <script src="./config.js"></script>
-  <script src="./script.js"></script>
-  <script src="./extras.js"></script>
+  <script src="./config.js"></script><script src="./script.js"></script><script src="./extras.js"></script>
 </body>
 </html>
