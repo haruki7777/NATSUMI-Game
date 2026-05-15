@@ -3,70 +3,79 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>NATSUMI Game</title>
+  <title>NATSUMI Game Arcade</title>
   <link rel="stylesheet" href="./style.css" />
 </head>
 <body>
-  <header class="hero">
-    <nav>
-      <strong>🦊 NATSUMI Game</strong>
-      <div>
-        <a href="#profile">프로필</a>
-        <a href="#shop">상점</a>
-        <a id="donateLink" class="donate hidden" target="_blank" rel="noreferrer">후원하기</a>
-      </div>
+  <div class="bg-orb orb-a"></div><div class="bg-orb orb-b"></div>
+  <header class="topbar">
+    <a class="brand" href="#home"><span class="fox-gif">🦊</span><b>NATSUMI Arcade</b></a>
+    <nav class="nav-menu">
+      <button data-view="profile" class="nav-btn active">프로필</button>
+      <button data-view="games" class="nav-btn">게임</button>
+      <button data-view="shop" class="nav-btn">상점</button>
+      <button data-view="rank" class="nav-btn">랭크카드</button>
     </nav>
-    <section class="hero-grid">
-      <div>
-        <p class="eyebrow">Discord Bot Game Portal</p>
-        <h1>출석, 금전, 랭크, 칭호를 한곳에서 봐.</h1>
-        <p class="sub">GitHub Pages에서 바로 열리는 나츠미 게임 사이트야. API를 연결하면 봇 데이터와 연동돼.</p>
-        <div class="search-box">
-          <input id="guildId" placeholder="서버 ID / Guild ID" />
-          <input id="userId" placeholder="디스코드 유저 ID" />
-          <button id="loadBtn">내 정보 보기</button>
-        </div>
-      </div>
-      <div class="fox-panel">
-        <span>🦊</span>
-        <h2>흥, 네 랭크를 확인해줄게.</h2>
-        <p>API가 없으면 데모 데이터로 보여주고, API가 있으면 실제 출석/랭크/금전을 불러와.</p>
-      </div>
-    </section>
+    <div class="login-box">
+      <span id="loginName">게스트 모드</span>
+      <a id="loginBtn" class="primary-link" href="/auth/discord">Discord 로그인</a>
+      <button id="logoutBtn" class="ghost hidden">로그아웃</button>
+    </div>
   </header>
 
-  <main>
-    <section id="profile" class="section">
-      <div class="section-title">
-        <p class="eyebrow">Profile</p>
-        <h2>게임 프로필</h2>
+  <main id="home" class="layout">
+    <section class="hero-card">
+      <div>
+        <p class="eyebrow">FOX GAME PORTAL</p>
+        <h1>나츠미 게임센터에 온 걸 환영해.</h1>
+        <p class="sub">디스코드 로그인 한 번으로 출석, 금전, 랭크, 칭호, 뱃지, 게임 상점까지 한 화면에서 볼 수 있어. 로그인 전에는 데모 모드로 놀 수 있고 말이야. 딱히 널 위해 만든 건 아니니까!</p>
+        <div class="quick-form">
+          <input id="guildId" placeholder="서버 ID / Guild ID" />
+          <input id="userId" placeholder="디스코드 유저 ID" />
+          <button id="loadBtn">프로필 불러오기</button>
+        </div>
       </div>
-      <div id="profileArea" class="empty">아직 불러온 유저가 없어. 위에서 유저 ID를 넣어줘.</div>
+      <div class="mascot-card">
+        <div class="mascot">🦊</div>
+        <div class="speech">GIF 느낌으로 둥실둥실 움직이는 나츠미야. 흥.</div>
+      </div>
     </section>
 
-    <section id="shop" class="section">
-      <div class="section-title">
-        <p class="eyebrow">Shop</p>
-        <h2>칭호 & 프로필 뱃지 상점</h2>
+    <section id="profileView" class="view active-view">
+      <div class="section-head"><p class="eyebrow">PROFILE</p><h2>내 게임 프로필</h2></div>
+      <div id="profileArea" class="empty">Discord 로그인하거나 유저 ID를 넣어줘.</div>
+    </section>
+
+    <section id="gamesView" class="view">
+      <div class="section-head"><p class="eyebrow">GAMES</p><h2>게임 선택</h2></div>
+      <div class="game-console">
+        <div class="game-list" id="gameList"></div>
+        <div class="game-play">
+          <div class="game-art" id="gameArt">🎰</div>
+          <h3 id="gameTitle">슬롯머신</h3>
+          <p id="gameDesc">같은 그림을 맞춰 금전을 노려봐.</p>
+          <div class="bet-row"><input id="betInput" type="number" min="100" value="1000" /><button id="playGameBtn">게임 시작</button></div>
+          <div id="gameResult" class="result-box">게임 결과가 여기에 표시돼.</div>
+        </div>
       </div>
-      <div class="shop-tabs">
-        <button class="tab active" data-tab="titles">칭호</button>
-        <button class="tab" data-tab="badges">뱃지</button>
-      </div>
+    </section>
+
+    <section id="shopView" class="view">
+      <div class="section-head"><p class="eyebrow">SHOP</p><h2>칭호 & 뱃지 상점</h2></div>
+      <div class="shop-tabs"><button class="tab active" data-tab="titles">칭호</button><button class="tab" data-tab="badges">프로필 뱃지</button></div>
       <div id="shopArea" class="cards"></div>
     </section>
 
-    <section class="section mini-game">
-      <div>
-        <p class="eyebrow">Mini Game</p>
-        <h2>나츠미 동전 뒤집기</h2>
-        <p>웹에서도 바로 즐길 수 있는 미니게임이야. API 백엔드 연결 후 금전 보상까지 붙일 수 있어.</p>
+    <section id="rankView" class="view">
+      <div class="section-head"><p class="eyebrow">RANK CARD</p><h2>웹 랭크카드</h2></div>
+      <div class="rank-preview">
+        <p>백엔드 API가 연결되어 있으면 랭크카드를 새 창에서 볼 수 있어.</p>
+        <a id="rankCardLink" class="primary-link" href="#profile" target="_blank">랭크카드 열기</a>
       </div>
-      <button id="flipBtn">동전 던지기</button>
-      <strong id="flipResult">🪙 준비됨</strong>
     </section>
   </main>
 
+  <a id="donateLink" class="float-donate hidden" target="_blank" rel="noreferrer">💖 후원하기</a>
   <script src="./config.js"></script>
   <script src="./script.js"></script>
 </body>
