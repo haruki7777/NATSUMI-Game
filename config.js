@@ -1,0 +1,5 @@
+window.NATSUMI_CONFIG = {
+  API_BASE: '',
+  DEFAULT_GUILD_ID: '',
+  DONATION_URL: ''
+};
