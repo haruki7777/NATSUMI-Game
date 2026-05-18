@@ -233,6 +233,27 @@ function setPlaying(playing) {
   button.textContent = playing ? "진행 중..." : "게임 시작";
 }
 
+function bindUiEvents() {
+  if (window.__natsumiUiBound) return;
+  window.__natsumiUiBound = true;
+  $("#loadBtn")?.addEventListener("click", loadProfile);
+  $("#playGameBtn")?.addEventListener("click", playGame);
+  $("#supportApplyBtn")?.addEventListener("click", applySupportRequest);
+  $("#logoutBtn")?.addEventListener("click", logout);
+  document.querySelectorAll(".nav-btn").forEach((button) => button.addEventListener("click", (event) => {
+    event.preventDefault();
+    event.stopPropagation();
+    showView(button.dataset.view);
+    closeMenu();
+  }, { capture: true }));
+  document.querySelectorAll(".tab[data-tab]").forEach((button) => button.addEventListener("click", () => {
+    document.querySelectorAll(".tab[data-tab]").forEach((tab) => tab.classList.remove("active"));
+    button.classList.add("active");
+    state.tab = button.dataset.tab;
+    renderShop();
+  }));
+}
+
 function renderProfile() {
   const profile = state.profile;
   if (!profile) return;
@@ -435,6 +456,7 @@ function initTheme() {
 async function init() {
   initTheme();
   state.config = await loadServerConfig(getConfig());
+  bindUiEvents();
   $("#loginBtn").href = authUrl();
   $("#loginBtn").addEventListener("click", (event) => {
     event.preventDefault();
@@ -462,22 +484,6 @@ async function init() {
     $("#profileArea").className = "empty";
     $("#profileArea").textContent = "Discord 로그인 후 내 레벨, 경험치, 금전, 랭크카드를 불러올 수 있어요.";
   }
-  $("#loadBtn").addEventListener("click", loadProfile);
-  $("#playGameBtn").addEventListener("click", playGame);
-  $("#supportApplyBtn")?.addEventListener("click", applySupportRequest);
-  $("#logoutBtn").addEventListener("click", logout);
-  document.querySelectorAll(".nav-btn").forEach((button) => button.addEventListener("click", (event) => {
-    event.preventDefault();
-    event.stopPropagation();
-    showView(button.dataset.view);
-    closeMenu();
-  }, { capture: true }));
-  document.querySelectorAll(".tab[data-tab]").forEach((button) => button.addEventListener("click", () => {
-    document.querySelectorAll(".tab[data-tab]").forEach((tab) => tab.classList.remove("active"));
-    button.classList.add("active");
-    state.tab = button.dataset.tab;
-    renderShop();
-  }));
 }
 
 init().catch((error) => {
