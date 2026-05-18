@@ -19,6 +19,7 @@ const DISCORD_CLIENT_SECRET = process.env.DISCORD_CLIENT_SECRET || '';
 const DISCORD_REDIRECT_URI = process.env.DISCORD_REDIRECT_URI || `${PUBLIC_BASE_URL}/auth/discord/callback`;
 const OWNER_USER_ID = process.env.OWNER_USER_ID || process.env.NATSUMI_OWNER_ID || '1293232804745838733';
 const calculateXP = (level) => level * level * 100;
+const escapeHtml = (value = '') => String(value).replace(/[&<>"']/g, (ch) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[ch]));
 
 app.use(express.json());
 app.use((req, res, next) => {
@@ -49,8 +50,12 @@ const SupportRequest = model('GameSupportRequest', new Schema({
   name: String,
   amount: Number,
   memo: String,
+  tierKey: String,
+  tierName: String,
+  rewards: { type: Schema.Types.Mixed, default: {} },
   status: { type: String, default: 'pending', index: true },
   createdAt: { type: Date, default: Date.now },
+  processedAt: Date,
 }));
 const AnimeInventory = model('AnimeInventory', new Schema({
   userId: { type: String, required: true, unique: true },
@@ -70,6 +75,12 @@ const animeGoods = {
   FAIL: ['빈 캡슐', '구겨진 교환권', '먼지 낀 박스', '다음 기회 쿠폰']
 };
 const animeRates = [['GOLDEN', 1], ['JACKPOT', 6], ['MEDIUM', 22], ['NORMAL', 62], ['FAIL', 100]];
+const supportTiers = [
+  { key: 'sprout', name: '새싹 후원자', min: 5000, title: '따뜻한 새싹 후원자', badge: '후원 새싹', money: 150000, emoji: '🌱' },
+  { key: 'heart', name: '하트 후원자', min: 10000, title: '분홍빛 하트 후원자', badge: '프리미엄 하트', money: 400000, emoji: '💗' },
+  { key: 'star', name: '별빛 후원자', min: 30000, title: '별빛 후원자', badge: '별빛 후원 배지', money: 1500000, emoji: '✨' },
+  { key: 'legend', name: '전설 후원자', min: 50000, title: '전설의 나츠미 후원자', badge: '전설 후원 인증', money: 3500000, emoji: '👑' }
+];
 
 const titleItems = [
   ['rookie_fox','초보 여우','아직은 귀엽게 봐줄 수 있는 신입.',50000,'🦊'],['daily_guardian','출석 수호자','출석 버튼을 지키는 성실한 녀석.',65000,'📅'],['coin_collector','동전 수집가','작은 금전도 놓치지 않는 타입.',80000,'🪙'],['night_gamer','새벽의 지배자','잠은 포기하고 랭크를 얻었다.',95000,'🌙'],['rank_hunter','랭크 사냥꾼','XP 냄새를 맡고 달려드는 사람.',110000,'🎯'],['fox_master','여우 조련사','나츠미한테 살아남은 전설의 유저.',130000,'🦊'],['lucky_tail','행운의 꼬리','이상하게 운이 따라붙는 녀석.',150000,'🍀'],['mvp','MVP','오늘의 주인공. 인정하기 싫지만 좀 멋짐.',180000,'🏆'],['combo_star','콤보 스타','한 번 흐름 타면 멈추지 않는 별.',210000,'🌟'],['boss_slayer','보스 슬레이어','강한 상대일수록 눈이 반짝인다.',240000,'⚔️'],['guild_ace','길드 에이스','서버에서 은근히 존재감 있는 사람.',280000,'🛡️'],['coin_whale','금전왕','주머니가 묵직한 수상한 사람.',330000,'💰'],['chat_legend','채팅 전설','말이 많지만 이상하게 재밌다.',390000,'💬'],['flame_heart','불꽃 심장','지는 건 싫어하는 뜨거운 타입.',460000,'🔥'],['crystal_mind','크리스탈 두뇌','운보다 계산으로 이기는 사람.',540000,'💎'],['shadow_runner','그림자 질주자','조용히 강해지는 은근한 실력자.',630000,'🥷'],['sunrise_hero','여명의 용사','아침부터 랭크를 챙기는 무서운 사람.',740000,'🌅'],['natsumi_favorite','나츠미의 관심대상','딱히 좋아하는 건 아니고, 그냥 보이는 거야.',880000,'😼'],['mythic_player','신화급 플레이어','슬슬 서버 기록에 이름이 남을 수준.',1050000,'🐉'],['eternal_champion','영원의 챔피언','비싸다. 그래서 더 폼 난다.',1300000,'👑']
@@ -85,6 +96,17 @@ function pick(list) { return list[Math.floor(Math.random() * list.length)]; }
 function currentUserId(req) { return req.session?.discordUser?.id || req.body?.userId || req.params?.userId || ''; }
 async function ensureMoney(userId) { let data = await Money.findOne({ userid: userId }); if (!data) data = await Money.create({ userid: userId, money: 0, date: Date.now() }); return data; }
 async function addMoney(userId, delta) { await Money.updateOne({ userid: userId }, { $inc: { money: delta }, $set: { date: Date.now() } }, { upsert: true }); return ensureMoney(userId); }
+function getSupportTier(amount) { return [...supportTiers].reverse().find((tier) => amount >= tier.min) || null; }
+function supportRewards(tier) { return tier ? { title: `support_${tier.key}_title`, badge: `support_${tier.key}_badge`, money: tier.money } : {}; }
+async function grantSupportRewards(userId, tier) {
+  if (!userId || !tier) return null;
+  const rewards = supportRewards(tier);
+  await Title.updateOne({ key: rewards.title }, { $set: { key: rewards.title, name: tier.title, description: `${tier.name} 전용 후원 칭호`, price: tier.min * 100, emoji: tier.emoji } }, { upsert: true });
+  await Badge.updateOne({ key: rewards.badge }, { $set: { key: rewards.badge, name: tier.badge, description: `${tier.name} 전용 후원 배지`, price: tier.min * 80, emoji: tier.emoji } }, { upsert: true });
+  await Inventory.updateOne({ userId }, { $addToSet: { titles: rewards.title, badges: rewards.badge }, $set: { activeTitle: rewards.title } }, { upsert: true });
+  await addMoney(userId, rewards.money);
+  return rewards;
+}
 function rollAnimeGood() { const chance = Math.random() * 100; const category = animeRates.find(([, limit]) => chance < limit)?.[0] || 'FAIL'; return { category, name: pick(animeGoods[category]) }; }
 async function saveAnimeGoods(userId, results) { let inv = await AnimeInventory.findOne({ userId }); if (!inv) inv = new AnimeInventory({ userId, items: {} }); for (const item of results) { if (item.category === 'FAIL') continue; inv.items.set(item.name, (inv.items.get(item.name) || 0) + 1); } await inv.save(); const names = results.filter((item) => item.category !== 'FAIL').map((item) => item.name); if (names.length) await Collection.updateOne({ userId }, { $addToSet: { animeItems: { $each: names } } }, { upsert: true }); return inv; }
 async function saveFishingCollection(userId, item) { if (item) await Collection.updateOne({ userId }, { $addToSet: { fishingItems: item } }, { upsert: true }); }
@@ -131,6 +153,7 @@ app.get('/api/config', (req, res) => res.json({
   donationEnabled: Boolean(DONATION_URL),
   donationUrl: DONATION_URL,
   donationAccount: DONATION_ACCOUNT,
+  supportTiers,
   discordLoginEnabled: Boolean(DISCORD_CLIENT_ID && DISCORD_CLIENT_SECRET),
   publicBaseUrl: PUBLIC_BASE_URL,
   discordRedirectUri: DISCORD_REDIRECT_URI,
@@ -169,6 +192,9 @@ app.post('/api/support/apply', async (req, res) => {
 
   if (!name) return res.status(400).json({ error: '입금자명 또는 닉네임을 적어줘.' });
   if (!amount) return res.status(400).json({ error: '후원 금액을 적어줘.' });
+  const tier = getSupportTier(amount);
+  if (!tier) return res.status(400).json({ error: '후원 자판기는 5,000원 이상부터 등급을 계산해.' });
+  const rewards = supportRewards(tier);
 
   const row = await SupportRequest.create({
     userId,
@@ -176,12 +202,18 @@ app.post('/api/support/apply', async (req, res) => {
     name,
     amount,
     memo,
+    tierKey: tier.key,
+    tierName: tier.name,
+    rewards,
   });
 
   res.json({
     ok: true,
     id: row._id,
-    message: '후원 인증 요청을 저장했어. 운영자가 확인한 뒤 후원자 효과를 지급하면 돼.',
+    status: 'pending',
+    tier,
+    rewards,
+    message: `${tier.emoji} ${tier.name} 등급으로 접수했어. 실제 입금 확인 뒤 자동 지급돼. 확인 실패면 서포트로 안내할게.`,
     donationUrl: DONATION_URL,
     donationAccount: DONATION_ACCOUNT,
   });
@@ -191,6 +223,28 @@ app.get('/api/support/requests', async (req, res) => {
   const rows = await SupportRequest.find().sort({ createdAt: -1 }).limit(50).lean();
   res.json({ requests: rows });
 });
+app.post('/api/support/requests/:id/approve', async (req, res) => {
+  if (!OWNER_USER_ID || req.session?.discordUser?.id !== OWNER_USER_ID) return res.status(403).json({ error: '운영자만 승인할 수 있어.' });
+  const row = await SupportRequest.findById(req.params.id);
+  if (!row) return res.status(404).json({ error: '후원 요청을 찾지 못했어.' });
+  if (row.status === 'approved') return res.json({ ok: true, status: row.status, message: '이미 지급된 후원이야.' });
+  const tier = supportTiers.find((item) => item.key === row.tierKey) || getSupportTier(row.amount);
+  if (!tier || row.userId === 'guest') return res.status(400).json({ error: '로그인된 후원자만 자동 지급할 수 있어. 서포트에서 수동 확인해줘.' });
+  const rewards = await grantSupportRewards(row.userId, tier);
+  row.status = 'approved';
+  row.tierKey = tier.key;
+  row.tierName = tier.name;
+  row.rewards = rewards;
+  row.processedAt = new Date();
+  await row.save();
+  res.json({ ok: true, status: row.status, tier, rewards, message: `${tier.name} 지급 완료` });
+});
+app.post('/api/support/requests/:id/reject', async (req, res) => {
+  if (!OWNER_USER_ID || req.session?.discordUser?.id !== OWNER_USER_ID) return res.status(403).json({ error: '운영자만 반려할 수 있어.' });
+  const row = await SupportRequest.findByIdAndUpdate(req.params.id, { $set: { status: 'rejected', processedAt: new Date() } }, { new: true });
+  if (!row) return res.status(404).json({ error: '후원 요청을 찾지 못했어.' });
+  res.json({ ok: true, status: row.status, message: '입금 확인 실패. 관리자에게 문의해줘.' });
+});
 
 app.post('/api/games/slot', async (req, res) => { const userId = currentUserId(req); const bet = clampBet(req.body.bet); if (!userId) return res.status(400).json({ error: '로그인이 필요해.' }); const money = await ensureMoney(userId); if (toInt(money.money, 0) < bet) return res.status(400).json({ error: '금전 부족!' }); const emojis = ['🍒','🍋','🍇','🔔','💎','7️⃣','🍀','🍎','🍐','🍊']; const reels = [pick(emojis), pick(emojis), pick(emojis)]; let delta = -bet, result = '꽝'; if (reels[0] === reels[1] && reels[1] === reels[2]) { delta = reels[0] === '7️⃣' ? bet * 20 : bet * 10; result = reels[0] === '7️⃣' ? '슈퍼 잭팟' : '잭팟'; } else if (new Set(reels).size === 2) { delta = Math.floor(bet * 1.5); result = '당첨'; } const after = await addMoney(userId, delta); res.json({ game: 'slot', reels, result, delta, money: toInt(after.money, 0) }); });
 app.post('/api/games/fishbun', async (req, res) => { const userId = currentUserId(req); const bet = clampBet(req.body.bet); if (!userId) return res.status(400).json({ error: '로그인이 필요해.' }); const money = await ensureMoney(userId); if (toInt(money.money, 0) < bet) return res.status(400).json({ error: '금전 부족!' }); const chance = Math.random() * 100; let item = '🔥 시꺼멓게 탄 붕어빵', delta = -bet, rarity = 'fail'; if (chance <= 0.5) { item = '✨ 전설의 황금 잉어빵'; delta = bet * (10 + Math.floor(Math.random() * 10)); rarity = 'legend'; } else if (chance <= 15.5) { item = '🍯 슈크림 대왕 붕어빵'; delta = Math.floor(bet * (1.5 + Math.random() * 4.5)); rarity = 'rare'; } else if (chance <= 40.5) { item = '🐟 클래식 팥 붕어빵'; delta = Math.floor(bet * (0.9 + Math.random() * 0.9)); rarity = 'normal'; } const after = await addMoney(userId, delta); res.json({ game: 'fishbun', item, rarity, delta, money: toInt(after.money, 0) }); });
@@ -198,6 +252,6 @@ app.post('/api/games/mine', async (req, res) => { const userId = currentUserId(r
 app.post('/api/games/mole', async (req, res) => { const userId = currentUserId(req); const { difficulty = 'easy', score = 0 } = req.body; if (!userId) return res.status(400).json({ error: '로그인이 필요해.' }); const configs = { safety: 25, easy: 100, medium: 400, hard: 1600 }; const safeScore = Math.max(0, Math.min(500, toInt(score, 0))); const reward = safeScore * (configs[difficulty] || configs.easy); const after = await addMoney(userId, reward); res.json({ game: 'mole', difficulty, score: safeScore, delta: reward, money: toInt(after.money, 0) }); });
 app.post('/api/games/fishing', async (req, res) => { const userId = currentUserId(req); if (!userId) return res.status(400).json({ error: '로그인이 필요해.' }); await ensureMoney(userId); let inv = await FishingInventory.findOne({ userId }); if (!inv) inv = await FishingInventory.create({ userId }); const chance = Math.random() * 100; let item = '떠내려온 나뭇가지', field = '', reward = 50; if (chance <= 0.5) { item = '황금 물고기'; field = 'goldenFish'; reward = 100000; } else if (chance <= 1.5) { item = '괜찮은 황금 물고기'; field = 'decentGoldenFish'; reward = 20000; } else if (chance <= 11.5) { item = '중형 물고기'; field = 'mediumFish'; reward = 3000; } else if (chance <= 31.5) { item = '일반 물고기'; field = 'regularFish'; reward = 800; } else if (chance <= 61.5) { item = '수상한 잡동사니'; field = 'curiousItem'; reward = 300; } if (field) { inv[field] += 1; await inv.save(); } await saveFishingCollection(userId, item); const after = await addMoney(userId, reward); res.json({ game: 'fishing', item, delta: reward, inventory: inv, money: toInt(after.money, 0) }); });
 app.post('/api/games/anime-gacha', async (req, res) => { const userId = currentUserId(req); if (!userId) return res.status(400).json({ error: '로그인이 필요해.' }); const rollCount = Math.max(1, Math.min(10, toInt(req.body?.rollCount, 1))); const cost = 5000 * rollCount; const money = await ensureMoney(userId); if (toInt(money.money, 0) < cost) return res.status(400).json({ error: '금전이 부족해.' }); const results = Array.from({ length: rollCount }, rollAnimeGood); await saveAnimeGoods(userId, results); const best = results.find((item) => item.category === 'GOLDEN') || results.find((item) => item.category === 'JACKPOT') || results[0]; const bonus = results.reduce((sum, item) => sum + ({ GOLDEN: 50000, JACKPOT: 15000, MEDIUM: 4000, NORMAL: 800, FAIL: 0 }[item.category] || 0), 0); const delta = bonus - cost; const after = await addMoney(userId, delta); res.json({ game: 'anime-gacha', result: best.category, item: best.name, results, delta, money: toInt(after.money, 0) }); });
-app.get('/rank-card/:guildId/:userId', async (req, res) => { const p = await getProfile(req.params.guildId, req.params.userId); const active = p.ownedTitles.find((t) => t.key === p.activeTitle); const badges = p.ownedBadges.slice(0, 8).map((b) => `${b.emoji} ${b.name}`).join(' · '); res.type('html').send(`<!doctype html><html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><link rel="stylesheet" href="/style.css"><title>NATSUMI Rank Card</title></head><body class="card-only"><section class="rank-card"><div class="rank-glow"></div><div><p class="eyebrow">${active ? `${active.emoji} ${active.name}` : '🦊 NATSUMI PLAYER'}</p><h1>${p.userId}</h1><p>${badges || '뱃지 없음'} · 출석 ${p.attendance}회 · ${p.money.toLocaleString()} 금전</p></div><div class="level-badge">Lv.${p.level}</div><div class="progress"><span style="width:${p.progress}%"></span></div><p>${p.xp.toLocaleString()} / ${p.needed.toLocaleString()} XP (${p.progress}%)</p></section></body></html>`); });
+app.get('/rank-card/:guildId/:userId', async (req, res) => { const p = await getProfile(req.params.guildId, req.params.userId); const active = p.ownedTitles.find((t) => t.key === p.activeTitle); const badges = p.ownedBadges.slice(0, 8).map((b) => `${b.emoji} ${b.name}`).join(' · '); const displayName = escapeHtml(req.query.name || req.query.username || p.displayName || `NATSUMI-${String(p.userId).slice(-4)}`); const title = escapeHtml(active ? `${active.emoji} ${active.name}` : '🦊 NATSUMI PLAYER'); const badgeText = escapeHtml(badges || '뱃지 없음'); res.type('html').send(`<!doctype html><html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><link rel="stylesheet" href="/style.css"><link rel="stylesheet" href="/game-enhance.css"><title>NATSUMI Rank Card</title></head><body class="card-only"><section class="rank-card web-rank-card"><div class="rank-glow"></div><div class="pixel-rank-grid"></div><div><p class="eyebrow">${title}</p><h1>${displayName}</h1><p>${badgeText} · 출석 ${p.attendance}회 · ${p.money.toLocaleString()} 금전</p></div><div class="level-badge">Lv.${p.level}</div><div class="stats"><div class="stat"><span>XP</span><b>${p.xp.toLocaleString()} / ${p.needed.toLocaleString()}</b></div><div class="stat"><span>ID</span><b>${escapeHtml(String(p.userId).slice(-6))}</b></div></div><div class="progress"><span style="width:${p.progress}%"></span></div><p>진행률 ${p.progress}%</p></section></body></html>`); });
 app.use((err, req, res, next) => { console.error(err); res.status(500).json({ error: '서버에서 문제가 생겼어.' }); });
 mongoose.connect(process.env.MONGO_URI).then(async () => { await seedShop(); app.listen(PORT, () => console.log(`NATSUMI Game running on ${PORT}`)); }).catch((err) => { console.error('MongoDB connection failed:', err.message); process.exit(1); });

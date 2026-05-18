@@ -25,6 +25,13 @@ const gameDefs = {
   anime: { name: "애니굿즈 가챠", icon: "gacha", desc: "봇의 애니굿즈 뽑기 감성을 웹 아케이드로 가져왔어요.", api: "/api/games/anime-gacha" }
 };
 
+const fallbackSupportTiers = [
+  { key: "sprout", name: "새싹 후원자", min: 5000, title: "따뜻한 새싹 후원자", badge: "후원 새싹", money: 150000, emoji: "🌱" },
+  { key: "heart", name: "하트 후원자", min: 10000, title: "분홍빛 하트 후원자", badge: "프리미엄 하트", money: 400000, emoji: "💗" },
+  { key: "star", name: "별빛 후원자", min: 30000, title: "별빛 후원자", badge: "별빛 후원 배지", money: 1500000, emoji: "✨" },
+  { key: "legend", name: "전설 후원자", min: 50000, title: "전설의 나츠미 후원자", badge: "전설 후원 인증", money: 3500000, emoji: "👑" }
+];
+
 const demoShop = {
   titles: [
     ["rookie_fox", "초보 여우", "처음 시작한 나츠미 플레이어", 50000, "N"],
@@ -63,7 +70,8 @@ async function loadServerConfig(baseConfig) {
       donationEnabled: Boolean(serverConfig.donationEnabled || baseConfig.donationUrl),
       discordLoginEnabled: Boolean(serverConfig.discordLoginEnabled),
       publicBaseUrl: serverConfig.publicBaseUrl || "",
-      discordRedirectUri: serverConfig.discordRedirectUri || ""
+      discordRedirectUri: serverConfig.discordRedirectUri || "",
+      supportTiers: Array.isArray(serverConfig.supportTiers) ? serverConfig.supportTiers : baseConfig.supportTiers
     };
   } catch {
     return baseConfig;
@@ -121,8 +129,13 @@ function requireLogin() {
   return false;
 }
 
+function displayNameFor(profile = state.profile) {
+  return state.me?.globalName || state.me?.username || profile?.displayName || `NATSUMI-${String(profile?.userId || "0000").slice(-4)}`;
+}
+
 function rankUrl(guildId, userId) {
-  return state.config.apiBase ? `${state.config.apiBase}/rank-card/${guildId}/${userId}` : "#rankView";
+  const name = encodeURIComponent(displayNameFor({ userId }));
+  return state.config.apiBase ? `${state.config.apiBase}/rank-card/${guildId}/${userId}?name=${name}` : "#rankView";
 }
 
 function showView(name) {
@@ -152,8 +165,9 @@ function showPixelResult({ title, lines = [], tone = "normal" }) {
 }
 
 function itemCard(item, type) {
-  return `<article class="item">
-    <div class="emoji">${item.emoji}</div>
+  const iconType = type === "title" ? "slot" : "gacha";
+  return `<article class="item pixel-shop-item">
+    <div class="shop-vending-window">${pixelIcon(iconType)}<span class="emoji">${item.emoji}</span></div>
     <h3>${item.name}</h3>
     <small>${item.description}</small>
     <p><b>${fmt(item.price)}</b> 금전</p>
@@ -248,8 +262,9 @@ function renderProfile() {
   const badges = profile.ownedBadges.length ? profile.ownedBadges.map((item) => `<span title="${item.name}">${item.emoji}</span>`).join(" ") : "배지 없음";
   $("#profileArea").className = "rank-card";
   $("#profileArea").innerHTML = `<div class="rank-glow"></div>
+    <div class="pixel-rank-grid"></div>
     <div><p class="eyebrow">${active ? `${active.emoji} ${active.name}` : "NATSUMI PLAYER"} ${state.demo ? " DEMO" : ""}</p>
-      <h1>${state.me?.globalName || state.me?.username || profile.userId}</h1><p>${badges}</p></div>
+      <h1>${displayNameFor(profile)}</h1><p>${badges}</p></div>
     <div class="level-badge">Lv.${profile.level}</div>
     <div class="stats">
       <div class="stat"><span>경험치</span><b>${fmt(profile.xp)} / ${fmt(profile.needed)}</b></div>
@@ -328,6 +343,23 @@ function renderBag() {
   const animeRows = (bag.anime || []).slice(0, 12).map((item) => `<span>${item.name} x${item.count}</span>`).join("");
   const fishRows = (bag.fishing || []).filter((item) => item.count > 0).map((item) => `<span>${item.name} x${item.count}</span>`).join("");
   area.innerHTML = `<div class="pixel-list"><b>가방</b>${animeRows || fishRows ? `${animeRows}${fishRows}` : "<small>아직 가방이 비어 있어요.</small>"}</div>`;
+}
+
+function renderSupportTiers() {
+  const area = $("#supportTierList");
+  if (!area) return;
+  const tiers = state.config.supportTiers?.length ? state.config.supportTiers : fallbackSupportTiers;
+  area.innerHTML = tiers.map((tier) => `<button class="support-tier" data-support-amount="${tier.min}" type="button">
+    <span class="tier-gif">${pixelIcon(tier.key === "legend" ? "gacha" : tier.key === "star" ? "slot" : "bun")}</span>
+    <b>${tier.emoji} ${tier.name}</b>
+    <small>${fmt(tier.min)}원 이상</small>
+    <em>${tier.title} · ${tier.badge} · ${fmt(tier.money)} 금전</em>
+  </button>`).join("");
+  document.querySelectorAll("[data-support-amount]").forEach((button) => button.addEventListener("click", () => {
+    $("#supportAmount").value = button.dataset.supportAmount;
+    document.querySelectorAll("[data-support-amount]").forEach((tier) => tier.classList.remove("active"));
+    button.classList.add("active");
+  }));
 }
 
 async function buyItem(event) {
@@ -453,9 +485,9 @@ async function applySupportRequest() {
   result.textContent = "후원 인증 요청을 저장하는 중...";
   try {
     const data = await api("/api/support/apply", { method: "POST", body: JSON.stringify({ name, amount, memo }) });
-    result.textContent = data.message || "후원 인증 요청을 저장했어.";
+    result.innerHTML = `<b>${data.tier?.emoji || ""} ${data.tier?.name || "후원 접수"}</b><br>${data.message || "후원 인증 요청을 저장했어."}<br><small>가짜 후원으로 확인되면 실패 처리되고 서포트 안내가 표시돼.</small>`;
   } catch (error) {
-    result.textContent = error.message;
+    result.innerHTML = `<b>후원 확인 실패</b><br>${error.message}<br><small>입금했는데 실패로 보이면 서포트에서 관리자에게 문의해줘.</small>`;
   }
   if (state.config.donationUrl) window.open(state.config.donationUrl, "_blank", "noopener,noreferrer");
 }
@@ -516,6 +548,7 @@ async function init() {
   state.config = await loadServerConfig(getConfig());
   bindUiEvents();
   $("#loginBtn").href = authUrl();
+  renderSupportTiers();
   if (state.config.donationEnabled) {
     $("#donateLink").href = state.config.donationUrl;
     $("#donateLink").classList.remove("hidden");
