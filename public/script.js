@@ -156,6 +156,15 @@ function showView(name) {
   document.querySelectorAll(".view").forEach((view) => view.classList.remove("active-view"));
   $(`#${name}View`)?.classList.add("active-view");
   document.querySelectorAll(".nav-btn").forEach((button) => button.classList.toggle("active", button.dataset.view === name));
+  window.scrollTo({ top: 0, behavior: "smooth" });
+}
+
+function closeMenu() {
+  document.querySelector("#drawerMenu")?.classList.remove("open");
+  document.querySelector("#menuBackdrop")?.classList.remove("open");
+  document.body.classList.remove("menu-open");
+  document.querySelector("#menuToggle")?.setAttribute("aria-expanded", "false");
+  document.querySelector("#drawerMenu")?.setAttribute("aria-hidden", "true");
 }
 
 function itemCard(item, type) {
@@ -190,10 +199,38 @@ function selectGame(key) {
   state.game = key;
   const game = gameDefs[key];
   document.querySelectorAll("[data-game]").forEach((button) => button.classList.toggle("active", button.dataset.game === key));
-  $("#gameArt").textContent = game.icon;
+  renderGameStage(key, game.icon);
   $("#gameTitle").textContent = game.name;
   $("#gameDesc").textContent = game.desc;
   $("#betInput").style.display = key === "fishing" ? "none" : "block";
+}
+
+function renderGameStage(key, icon, active = false) {
+  const stage = $("#gameStage");
+  if (!stage) return;
+  stage.className = `game-stage ${key === "fishing" ? "fish-stage" : ""}`;
+  if (key === "slot") {
+    stage.innerHTML = `<div class="reel-row">
+      <div class="reel ${active ? "spin" : ""}">${active ? "N" : "7"}</div>
+      <div class="reel ${active ? "spin" : ""}">${active ? "A" : "7"}</div>
+      <div class="reel ${active ? "spin" : ""}">${active ? "T" : "7"}</div>
+    </div>`;
+  } else if (key === "fishing") {
+    stage.innerHTML = `<div class="water"></div><div class="fish-shadow">FISH</div><div class="bobber ${active ? "fish-caught" : ""}">HOOK</div>`;
+  } else if (key === "mine") {
+    stage.innerHTML = `<div class="mine-grid">${Array.from({ length: 9 }, (_, i) => `<button class="mine-cell" type="button">${active && i === 4 ? "GEM" : "?"}</button>`).join("")}</div>`;
+  } else if (key === "mole") {
+    stage.innerHTML = `<div class="mole-grid">${Array.from({ length: 9 }, (_, i) => `<button class="mole-cell ${active && i % 2 === 0 ? "active" : ""}" type="button">${active && i % 2 === 0 ? "HIT" : ""}</button>`).join("")}</div>`;
+  } else {
+    stage.innerHTML = `<div class="bun-machine"><div class="bun-window">${active ? "HOT" : icon}</div><b>달콤한 결과를 굽는 중</b></div>`;
+  }
+}
+
+function setPlaying(playing) {
+  const button = $("#playGameBtn");
+  if (!button) return;
+  button.disabled = playing;
+  button.textContent = playing ? "진행 중..." : "게임 시작";
 }
 
 function renderProfile() {
@@ -236,10 +273,12 @@ async function loadMe() {
     $("#loginName").textContent = `${state.me.globalName || state.me.username}님`;
     $("#loginBtn").classList.add("hidden");
     $("#logoutBtn").classList.remove("hidden");
+    $("#loadBtn")?.classList.add("hidden");
   } else {
     $("#loginName").textContent = "게스트 모드";
     $("#loginBtn").classList.remove("hidden");
     $("#logoutBtn").classList.add("hidden");
+    $("#loadBtn")?.classList.remove("hidden");
   }
 }
 
@@ -304,9 +343,13 @@ async function playGame() {
   const game = gameDefs[key];
   const userId = currentUserId();
   const bet = Number($("#betInput").value || 1000);
-  $("#gameResult").textContent = "나츠미가 결과를 계산하는 중...";
+  setPlaying(true);
+  renderGameStage(key, game.icon, true);
+  $("#gameResult").textContent = `${game.name} 진행 중...\n나츠미가 결과를 뽑고 있어요.`;
   try {
+    await new Promise((resolve) => setTimeout(resolve, 650));
     const data = await api(game.api, { method: "POST", body: JSON.stringify({ userId, bet, score: key === "mole" ? Math.floor(Math.random() * 80) + 20 : undefined, difficulty: "medium" }) });
+    renderGameStage(key, game.icon, false);
     $("#gameResult").textContent = formatGameResult(data);
     await loadProfile();
   } catch {
@@ -314,8 +357,11 @@ async function playGame() {
     const delta = demoGameDelta(key, bet);
     inv.money = Math.max(0, inv.money + delta);
     saveInv(userId, inv);
+    renderGameStage(key, game.icon, false);
     $("#gameResult").textContent = `${game.name} 데모 결과\n변동 금전: ${delta >= 0 ? "+" : ""}${fmt(delta)}\n현재 금전: ${fmt(inv.money)}`;
     await loadProfile();
+  } finally {
+    setPlaying(false);
   }
 }
 
@@ -420,7 +466,12 @@ async function init() {
   $("#playGameBtn").addEventListener("click", playGame);
   $("#supportApplyBtn")?.addEventListener("click", applySupportRequest);
   $("#logoutBtn").addEventListener("click", logout);
-  document.querySelectorAll(".nav-btn").forEach((button) => button.addEventListener("click", () => showView(button.dataset.view)));
+  document.querySelectorAll(".nav-btn").forEach((button) => button.addEventListener("click", (event) => {
+    event.preventDefault();
+    event.stopPropagation();
+    showView(button.dataset.view);
+    closeMenu();
+  }, { capture: true }));
   document.querySelectorAll(".tab[data-tab]").forEach((button) => button.addEventListener("click", () => {
     document.querySelectorAll(".tab[data-tab]").forEach((tab) => tab.classList.remove("active"));
     button.classList.add("active");
