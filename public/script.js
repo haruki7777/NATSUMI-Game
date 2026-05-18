@@ -45,8 +45,29 @@ function getConfig() {
     apiBase: (config.API_BASE || "").replace(/\/$/, ""),
     defaultGuildId: config.DEFAULT_GUILD_ID || "",
     donationUrl: config.DONATION_URL || "",
+    donationAccount: config.DONATION_ACCOUNT || "",
     donationEnabled: Boolean(config.DONATION_URL)
   };
+}
+
+async function loadServerConfig(baseConfig) {
+  try {
+    const res = await fetch(`${baseConfig.apiBase || ""}/api/config`, { credentials: "include" });
+    if (!res.ok) return baseConfig;
+    const serverConfig = await res.json();
+    return {
+      ...baseConfig,
+      defaultGuildId: serverConfig.defaultGuildId || baseConfig.defaultGuildId,
+      donationUrl: serverConfig.donationUrl || baseConfig.donationUrl,
+      donationAccount: serverConfig.donationAccount || baseConfig.donationAccount,
+      donationEnabled: Boolean(serverConfig.donationEnabled || baseConfig.donationUrl),
+      discordLoginEnabled: Boolean(serverConfig.discordLoginEnabled),
+      publicBaseUrl: serverConfig.publicBaseUrl || "",
+      discordRedirectUri: serverConfig.discordRedirectUri || "",
+    };
+  } catch {
+    return baseConfig;
+  }
 }
 
 function readAll() {
@@ -71,7 +92,6 @@ function saveInv(userId, inv) {
 }
 
 async function api(url, options) {
-  if (!state.config?.apiBase) throw new Error("NO_API");
   const res = await fetch(`${state.config.apiBase}${url}`, {
     credentials: "include",
     headers: { "content-type": "application/json" },
@@ -300,11 +320,42 @@ async function logout() {
   location.reload();
 }
 
+async function applySupportRequest() {
+  const result = $("#supportResult");
+  const name = $("#supportName")?.value?.trim() || "";
+  const amount = Number($("#supportAmount")?.value || 0);
+  const memo = $("#supportMemo")?.value?.trim() || "";
+
+  if (!name || !amount) {
+    result.textContent = "입금자명과 후원 금액을 적어줘.";
+    return;
+  }
+
+  result.textContent = "후원 인증 요청을 저장하는 중...";
+  try {
+    const data = await api("/api/support/apply", {
+      method: "POST",
+      body: JSON.stringify({ name, amount, memo })
+    });
+    result.textContent = data.message || "후원 인증 요청을 저장했어.";
+  } catch {
+    const rows = JSON.parse(localStorage.getItem("natsumi-support-requests") || "[]");
+    rows.unshift({ name, amount, memo, createdAt: new Date().toISOString() });
+    localStorage.setItem("natsumi-support-requests", JSON.stringify(rows.slice(0, 20)));
+    result.textContent = "서버 저장은 실패했지만 이 브라우저에 임시 저장했어. 잠시 뒤 다시 시도해줘.";
+  }
+
+  if (state.config.donationUrl) window.open(state.config.donationUrl, "_blank", "noopener,noreferrer");
+}
+
 async function init() {
-  state.config = getConfig();
+  state.config = await loadServerConfig(getConfig());
   if (state.config.donationEnabled) {
     $("#donateLink").href = state.config.donationUrl;
     $("#donateLink").classList.remove("hidden");
+  }
+  if (!state.config.discordLoginEnabled) {
+    $("#loginBtn").title = "Discord 개발자 포털의 OAuth2 Redirect URL과 서버 환경변수가 필요해요.";
   }
   await loadMe();
   try {
@@ -318,6 +369,7 @@ async function init() {
   await loadProfile();
   $("#loadBtn").addEventListener("click", loadProfile);
   $("#playGameBtn").addEventListener("click", playGame);
+  $("#supportApplyBtn")?.addEventListener("click", applySupportRequest);
   $("#logoutBtn").addEventListener("click", logout);
   document.querySelectorAll(".nav-btn").forEach((button) => button.addEventListener("click", () => showView(button.dataset.view)));
   document.querySelectorAll(".tab[data-tab]").forEach((button) => button.addEventListener("click", () => {
