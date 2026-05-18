@@ -5,10 +5,10 @@ const storeKey = "natsumi-game-demo";
 
 const gameDefs = {
   slot: { name: "슬롯머신", icon: "777", desc: "같은 그림을 맞춰 금전을 노려보세요.", api: "/api/games/slot" },
-  fishbun: { name: "붕어빵 뽑기", icon: "BUN", desc: "따끈한 붕어빵 운세로 금전을 얻는 게임이에요.", api: "/api/games/fishbun" },
+  fishbun: { name: "붕어빵 뽑기", icon: "BUN", desc: "달콤한 붕어빵 속에서 금전을 찾는 게임이에요.", api: "/api/games/fishbun" },
   mine: { name: "비밀 광산", icon: "GEM", desc: "위험한 광산에서 보석을 캐 보세요.", api: "/api/games/mine" },
-  mole: { name: "두더지 잡기", icon: "HIT", desc: "점수에 따라 보상을 정산하는 미니게임이에요.", api: "/api/games/mole" },
-  fishing: { name: "낚시", icon: "FISH", desc: "물고기와 신기한 아이템을 낚아 금전을 벌어요.", api: "/api/games/fishing" }
+  mole: { name: "두더지 잡기", icon: "HIT", desc: "점수를 따라 보상이 정산되는 미니게임이에요.", api: "/api/games/mole" },
+  fishing: { name: "낚시", icon: "FISH", desc: "물고기와 희귀 아이템을 낚아 금전을 벌어요.", api: "/api/games/fishing" }
 };
 
 const cleanTitles = [
@@ -21,7 +21,7 @@ const cleanTitles = [
   ["lucky_tail", "행운의 꼬리", "이상하게 운이 따라붙는 유저", 150000, "LUCK"],
   ["mvp", "MVP", "오늘의 주인공", 180000, "MVP"],
   ["combo_star", "콤보 스타", "흐름을 놓치지 않는 유저", 210000, "STAR"],
-  ["eternal_champion", "영원한 챔피언", "최상위권을 향하는 유저", 1300000, "TOP"]
+  ["eternal_champion", "영원한 챔피언", "최상위권에 어울리는 칭호", 1300000, "TOP"]
 ].map(([key, name, description, price, emoji]) => ({ key, name, description, price, emoji }));
 
 const cleanBadges = [
@@ -34,7 +34,7 @@ const cleanBadges = [
   ["rank_spark", "랭크 스파크", "랭크카드에 어울리는 배지", 160000, "RANK"],
   ["moon_mark", "달빛 표식", "밤 접속자에게 어울리는 감성", 190000, "MOON"],
   ["supporter", "서포터", "후원자를 위한 전용 표시", 1000000, "SUP"],
-  ["legend_stamp", "전설 인증", "이름값이 느껴지는 최상급 배지", 1250000, "LEG"]
+  ["legend_stamp", "전설 인증", "이름값이 확실한 최상급 배지", 1250000, "LEG"]
 ].map(([key, name, description, price, emoji]) => ({ key, name, description, price, emoji }));
 
 const demoShop = { titles: cleanTitles, badges: cleanBadges };
@@ -46,7 +46,8 @@ function getConfig() {
     defaultGuildId: config.DEFAULT_GUILD_ID || "",
     donationUrl: config.DONATION_URL || "",
     donationAccount: config.DONATION_ACCOUNT || "",
-    donationEnabled: Boolean(config.DONATION_URL)
+    donationEnabled: Boolean(config.DONATION_URL),
+    discordLoginEnabled: false
   };
 }
 
@@ -91,13 +92,14 @@ function saveInv(userId, inv) {
   writeAll(all);
 }
 
-async function api(url, options) {
+async function api(url, options = {}) {
   const res = await fetch(`${state.config.apiBase}${url}`, {
     credentials: "include",
-    headers: { "content-type": "application/json" },
+    headers: { "content-type": "application/json", ...(options.headers || {}) },
     ...options
   });
-  const data = await res.json();
+  const text = await res.text();
+  const data = text ? JSON.parse(text) : {};
   if (!res.ok) throw new Error(data.error || "요청 실패");
   return data;
 }
@@ -111,7 +113,7 @@ function rankUrl(guildId, userId) {
 }
 
 function normalizeShop(shop) {
-  if (!shop?.titles?.length || /[?�]/.test(`${shop.titles[0].name}${shop.titles[0].description}`)) return demoShop;
+  if (!shop?.titles?.length) return demoShop;
   return shop;
 }
 
@@ -221,6 +223,8 @@ async function loadMe() {
     $("#logoutBtn").classList.remove("hidden");
   } else {
     $("#loginName").textContent = "게스트 모드";
+    $("#loginBtn").classList.remove("hidden");
+    $("#logoutBtn").classList.add("hidden");
   }
 }
 
@@ -229,12 +233,7 @@ async function loadProfile() {
   const userId = currentUserId();
   try {
     state.profile = await api(`/api/profile/${guildId}/${userId}`);
-    if (/[?�]/.test(`${state.profile.ownedTitles?.[0]?.name || ""}${state.profile.ownedBadges?.[0]?.name || ""}`)) {
-      state.profile = demoProfile(guildId, userId);
-      state.demo = true;
-    } else {
-      state.demo = false;
-    }
+    state.demo = false;
   } catch {
     state.profile = demoProfile(guildId, userId);
     state.demo = true;
@@ -257,7 +256,7 @@ async function buyItem(event) {
     const inv = getInv(userId);
     const field = itemType === "title" ? "titles" : "badges";
     if (inv[field].includes(key)) return alert("이미 가지고 있는 아이템이에요.");
-    if (inv.money < item.price) return alert(`금전 부족: 필요 ${fmt(item.price)}, 보유 ${fmt(inv.money)}`);
+    if (inv.money < item.price) return alert(`금전 부족! 필요 ${fmt(item.price)}, 보유 ${fmt(inv.money)}`);
     inv.money -= item.price;
     inv[field].push(key);
     if (itemType === "title" && !inv.activeTitle) inv.activeTitle = key;
