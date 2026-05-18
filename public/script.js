@@ -1,44 +1,42 @@
-let state = { config: null, shop: null, profile: null, tab: "titles", demo: false, me: null, game: "slot" };
+let state = {
+  config: null,
+  shop: null,
+  profile: null,
+  tab: "titles",
+  arcadeTab: "bag",
+  demo: false,
+  me: null,
+  game: "slot",
+  bag: null,
+  mole: null
+};
+
 const $ = (query) => document.querySelector(query);
 const fmt = (value) => Number(value || 0).toLocaleString("ko-KR");
 const storeKey = "natsumi-game-demo";
 const themeKey = "natsumi-game-theme";
 
 const gameDefs = {
-  slot: { name: "슬롯머신", icon: "777", desc: "같은 그림을 맞춰 금전을 노려보세요.", api: "/api/games/slot" },
-  fishbun: { name: "붕어빵 뽑기", icon: "BUN", desc: "달콤한 붕어빵 속에서 금전을 찾는 게임이에요.", api: "/api/games/fishbun" },
-  mine: { name: "비밀 광산", icon: "GEM", desc: "위험한 광산에서 보석을 캐 보세요.", api: "/api/games/mine" },
-  mole: { name: "두더지 잡기", icon: "HIT", desc: "점수를 따라 보상이 정산되는 미니게임이에요.", api: "/api/games/mole" },
-  fishing: { name: "낚시", icon: "FISH", desc: "물고기와 희귀 아이템을 낚아 금전을 벌어요.", api: "/api/games/fishing" }
+  slot: { name: "픽셀 슬롯", icon: "slot", desc: "세 칸을 맞춰 금전을 노리는 클래식 아케이드 게임.", api: "/api/games/slot" },
+  fishbun: { name: "붕어빵 뽑기", icon: "bun", desc: "따끈한 붕어빵 기계에서 달콤한 보상을 뽑아요.", api: "/api/games/fishbun" },
+  mine: { name: "비밀 광산", icon: "mine", desc: "칸을 열어 보석을 찾는 픽셀 광산 탐험.", api: "/api/games/mine" },
+  mole: { name: "두더지 속도전", icon: "mole", desc: "8초 동안 튀어나오는 두더지를 최대한 빠르게 잡아요.", api: "/api/games/mole" },
+  fishing: { name: "나츠미 낚시터", icon: "fish", desc: "물결을 기다렸다가 희귀 물고기와 보상을 낚아요.", api: "/api/games/fishing" },
+  anime: { name: "애니굿즈 가챠", icon: "gacha", desc: "봇의 애니굿즈 뽑기 감성을 웹 아케이드로 가져왔어요.", api: "/api/games/anime-gacha" }
 };
 
-const cleanTitles = [
-  ["rookie_fox", "초보 여우", "처음 시작한 나츠미 플레이어", 50000, "N"],
-  ["daily_guardian", "출석 수호자", "꾸준히 출석하는 성실한 유저", 65000, "DAY"],
-  ["coin_collector", "동전 수집가", "작은 금전도 놓치지 않는 유저", 80000, "COIN"],
-  ["night_gamer", "야행성 게이머", "밤에도 게임을 즐기는 유저", 95000, "MOON"],
-  ["rank_hunter", "랭크 사냥꾼", "XP와 레벨을 노리는 유저", 110000, "RANK"],
-  ["fox_master", "여우 조련사", "나츠미와 잘 어울리는 유저", 130000, "FOX"],
-  ["lucky_tail", "행운의 꼬리", "이상하게 운이 따라붙는 유저", 150000, "LUCK"],
-  ["mvp", "MVP", "오늘의 주인공", 180000, "MVP"],
-  ["combo_star", "콤보 스타", "흐름을 놓치지 않는 유저", 210000, "STAR"],
-  ["eternal_champion", "영원한 챔피언", "최상위권에 어울리는 칭호", 1300000, "TOP"]
-].map(([key, name, description, price, emoji]) => ({ key, name, description, price, emoji }));
-
-const cleanBadges = [
-  ["first_step", "첫 발자국", "나츠미 게임에 입문한 증표", 50000, "1ST"],
-  ["tiny_coin", "작은 동전", "시작을 기념하는 배지", 60000, "COIN"],
-  ["daily_soul", "출석혼", "출석을 사랑하는 유저의 배지", 75000, "DAY"],
-  ["sparkle", "반짝임", "프로필에 빛을 더하는 배지", 90000, "SPK"],
-  ["fox_paw", "여우 발바닥", "귀여운 흔적을 남기는 배지", 110000, "PAW"],
-  ["hot_streak", "연승 불꽃", "기세가 살아 있는 배지", 135000, "FIRE"],
-  ["rank_spark", "랭크 스파크", "랭크카드에 어울리는 배지", 160000, "RANK"],
-  ["moon_mark", "달빛 표식", "밤 접속자에게 어울리는 감성", 190000, "MOON"],
-  ["supporter", "서포터", "후원자를 위한 전용 표시", 1000000, "SUP"],
-  ["legend_stamp", "전설 인증", "이름값이 확실한 최상급 배지", 1250000, "LEG"]
-].map(([key, name, description, price, emoji]) => ({ key, name, description, price, emoji }));
-
-const demoShop = { titles: cleanTitles, badges: cleanBadges };
+const demoShop = {
+  titles: [
+    ["rookie_fox", "초보 여우", "처음 시작한 나츠미 플레이어", 50000, "N"],
+    ["daily_guardian", "출석 수호자", "꾸준히 출석하는 성실한 유저", 65000, "DAY"],
+    ["coin_collector", "동전 수집가", "작은 금전도 놓치지 않는 유저", 80000, "COIN"]
+  ].map(([key, name, description, price, emoji]) => ({ key, name, description, price, emoji })),
+  badges: [
+    ["first_step", "첫 발자국", "나츠미 게임에 입문한 증표", 50000, "1ST"],
+    ["sparkle", "반짝임", "프로필에 빛을 더하는 배지", 90000, "SPK"],
+    ["supporter", "서포터", "후원자를 위한 전용 표시", 1000000, "SUP"]
+  ].map(([key, name, description, price, emoji]) => ({ key, name, description, price, emoji }))
+};
 
 function getConfig() {
   const config = window.NATSUMI_CONFIG || {};
@@ -65,7 +63,7 @@ async function loadServerConfig(baseConfig) {
       donationEnabled: Boolean(serverConfig.donationEnabled || baseConfig.donationUrl),
       discordLoginEnabled: Boolean(serverConfig.discordLoginEnabled),
       publicBaseUrl: serverConfig.publicBaseUrl || "",
-      discordRedirectUri: serverConfig.discordRedirectUri || "",
+      discordRedirectUri: serverConfig.discordRedirectUri || ""
     };
   } catch {
     return baseConfig;
@@ -82,7 +80,7 @@ function writeAll(value) {
 
 function getInv(userId) {
   const all = readAll();
-  if (!all[userId]) all[userId] = { money: 300000, titles: ["rookie_fox"], badges: ["first_step"], activeTitle: "rookie_fox" };
+  if (!all[userId]) all[userId] = { money: 300000, titles: ["rookie_fox"], badges: ["first_step"], activeTitle: "rookie_fox", anime: {}, fish: {} };
   writeAll(all);
   return all[userId];
 }
@@ -109,10 +107,6 @@ function currentUserId() {
   return state.me?.id || "demo-user";
 }
 
-function rankUrl(guildId, userId) {
-  return state.config.apiBase ? `${state.config.apiBase}/rank-card/${guildId}/${userId}` : "#rankView";
-}
-
 function authUrl() {
   return `${state.config.apiBase || ""}/auth/discord`;
 }
@@ -127,29 +121,8 @@ function requireLogin() {
   return false;
 }
 
-function normalizeShop(shop) {
-  if (!shop?.titles?.length) return demoShop;
-  return shop;
-}
-
-function demoProfile(guildId, userId) {
-  const inv = getInv(userId);
-  const level = 12;
-  const xp = 4750;
-  const needed = level * level * 100;
-  return {
-    guildId,
-    userId,
-    level,
-    xp,
-    needed,
-    progress: Math.round((xp / needed) * 1000) / 10,
-    money: inv.money,
-    attendance: 27,
-    activeTitle: inv.activeTitle,
-    ownedTitles: demoShop.titles.filter((item) => inv.titles.includes(item.key)),
-    ownedBadges: demoShop.badges.filter((item) => inv.badges.includes(item.key))
-  };
+function rankUrl(guildId, userId) {
+  return state.config.apiBase ? `${state.config.apiBase}/rank-card/${guildId}/${userId}` : "#rankView";
 }
 
 function showView(name) {
@@ -165,6 +138,17 @@ function closeMenu() {
   document.body.classList.remove("menu-open");
   document.querySelector("#menuToggle")?.setAttribute("aria-expanded", "false");
   document.querySelector("#drawerMenu")?.setAttribute("aria-hidden", "true");
+}
+
+function pixelIcon(type) {
+  return `<span class="pixel-icon pixel-${type}" aria-hidden="true"><i></i><b></b><em></em></span>`;
+}
+
+function showPixelResult({ title, lines = [], tone = "normal" }) {
+  const stage = $("#gameStage");
+  if (!stage) return;
+  const body = lines.map((line) => `<p>${line}</p>`).join("");
+  stage.insertAdjacentHTML("beforeend", `<div class="pixel-result result-${tone}"><strong>${title}</strong>${body}</div>`);
 }
 
 function itemCard(item, type) {
@@ -188,7 +172,7 @@ function renderGames() {
   const area = $("#gameList");
   if (!area) return;
   area.innerHTML = Object.entries(gameDefs).map(([key, game]) => `<button class="game-choice ${state.game === key ? "active" : ""}" data-game="${key}" type="button">
-    <span class="game-icon">${game.icon}</span>
+    ${pixelIcon(game.icon)}
     <span><b>${game.name}</b><br><small>${game.desc}</small></span>
   </button>`).join("");
   document.querySelectorAll("[data-game]").forEach((button) => button.addEventListener("click", () => selectGame(button.dataset.game)));
@@ -199,30 +183,31 @@ function selectGame(key) {
   state.game = key;
   const game = gameDefs[key];
   document.querySelectorAll("[data-game]").forEach((button) => button.classList.toggle("active", button.dataset.game === key));
-  renderGameStage(key, game.icon);
+  renderGameStage(key);
   $("#gameTitle").textContent = game.name;
   $("#gameDesc").textContent = game.desc;
-  $("#betInput").style.display = key === "fishing" ? "none" : "block";
+  $("#betInput").style.display = ["fishing", "anime", "mole"].includes(key) ? "none" : "block";
+  $("#playGameBtn").textContent = key === "mole" ? "속도전 시작" : key === "anime" ? "1회 뽑기" : "게임 시작";
 }
 
-function renderGameStage(key, icon, active = false) {
+function renderGameStage(key, active = false) {
   const stage = $("#gameStage");
   if (!stage) return;
-  stage.className = `game-stage ${key === "fishing" ? "fish-stage" : ""}`;
+  stage.className = `game-stage pixel-stage stage-${key} ${active ? "is-playing" : ""}`;
   if (key === "slot") {
-    stage.innerHTML = `<div class="reel-row">
-      <div class="reel ${active ? "spin" : ""}">${active ? "N" : "7"}</div>
-      <div class="reel ${active ? "spin" : ""}">${active ? "A" : "7"}</div>
-      <div class="reel ${active ? "spin" : ""}">${active ? "T" : "7"}</div>
-    </div>`;
+    stage.innerHTML = `<div class="pixel-cabinet">${pixelIcon("slot")}<div class="reel-row">
+      <div class="reel ${active ? "spin" : ""}">N</div><div class="reel ${active ? "spin" : ""}">A</div><div class="reel ${active ? "spin" : ""}">T</div>
+    </div></div>`;
   } else if (key === "fishing") {
-    stage.innerHTML = `<div class="water"></div><div class="fish-shadow">FISH</div><div class="bobber ${active ? "fish-caught" : ""}">HOOK</div>`;
+    stage.innerHTML = `<div class="water"></div><div class="fish-shadow">FISH</div><div class="bobber ${active ? "fish-caught" : ""}">HOOK</div><div class="pixel-ripple"></div>`;
   } else if (key === "mine") {
     stage.innerHTML = `<div class="mine-grid">${Array.from({ length: 9 }, (_, i) => `<button class="mine-cell" type="button">${active && i === 4 ? "GEM" : "?"}</button>`).join("")}</div>`;
   } else if (key === "mole") {
-    stage.innerHTML = `<div class="mole-grid">${Array.from({ length: 9 }, (_, i) => `<button class="mole-cell ${active && i % 2 === 0 ? "active" : ""}" type="button">${active && i % 2 === 0 ? "HIT" : ""}</button>`).join("")}</div>`;
+    stage.innerHTML = `<div class="mole-hud"><b id="moleTimer">8.0</b><span id="moleScore">0 HIT</span></div><div class="mole-grid">${Array.from({ length: 9 }, (_, i) => `<button class="mole-cell" data-mole="${i}" type="button"></button>`).join("")}</div>`;
+  } else if (key === "anime") {
+    stage.innerHTML = `<div class="gacha-machine">${pixelIcon("gacha")}<div class="capsule ${active ? "capsule-roll" : ""}">CAPSULE</div><div class="pixel-lightbar"></div></div>`;
   } else {
-    stage.innerHTML = `<div class="bun-machine"><div class="bun-window">${active ? "HOT" : icon}</div><b>달콤한 결과를 굽는 중</b></div>`;
+    stage.innerHTML = `<div class="bun-machine">${pixelIcon("bun")}<div class="bun-window">${active ? "HOT" : "BUN"}</div></div>`;
   }
 }
 
@@ -230,28 +215,27 @@ function setPlaying(playing) {
   const button = $("#playGameBtn");
   if (!button) return;
   button.disabled = playing;
-  button.textContent = playing ? "진행 중..." : "게임 시작";
+  button.textContent = playing ? "진행 중..." : state.game === "mole" ? "속도전 시작" : state.game === "anime" ? "1회 뽑기" : "게임 시작";
 }
 
-function bindUiEvents() {
-  if (window.__natsumiUiBound) return;
-  window.__natsumiUiBound = true;
-  $("#loadBtn")?.addEventListener("click", loadProfile);
-  $("#playGameBtn")?.addEventListener("click", playGame);
-  $("#supportApplyBtn")?.addEventListener("click", applySupportRequest);
-  $("#logoutBtn")?.addEventListener("click", logout);
-  document.querySelectorAll(".nav-btn").forEach((button) => button.addEventListener("click", (event) => {
-    event.preventDefault();
-    event.stopPropagation();
-    showView(button.dataset.view);
-    closeMenu();
-  }, { capture: true }));
-  document.querySelectorAll(".tab[data-tab]").forEach((button) => button.addEventListener("click", () => {
-    document.querySelectorAll(".tab[data-tab]").forEach((tab) => tab.classList.remove("active"));
-    button.classList.add("active");
-    state.tab = button.dataset.tab;
-    renderShop();
-  }));
+function demoProfile(guildId, userId) {
+  const inv = getInv(userId);
+  const level = 12;
+  const xp = 4750;
+  const needed = level * level * 100;
+  return {
+    guildId,
+    userId,
+    level,
+    xp,
+    needed,
+    progress: Math.round((xp / needed) * 1000) / 10,
+    money: inv.money,
+    attendance: 27,
+    activeTitle: inv.activeTitle,
+    ownedTitles: demoShop.titles.filter((item) => inv.titles.includes(item.key)),
+    ownedBadges: demoShop.badges.filter((item) => inv.badges.includes(item.key))
+  };
 }
 
 function renderProfile() {
@@ -264,11 +248,8 @@ function renderProfile() {
   const badges = profile.ownedBadges.length ? profile.ownedBadges.map((item) => `<span title="${item.name}">${item.emoji}</span>`).join(" ") : "배지 없음";
   $("#profileArea").className = "rank-card";
   $("#profileArea").innerHTML = `<div class="rank-glow"></div>
-    <div>
-      <p class="eyebrow">${active ? `${active.emoji} ${active.name}` : "NATSUMI PLAYER"} ${state.demo ? " DEMO" : ""}</p>
-      <h1>${state.me?.globalName || state.me?.username || profile.userId}</h1>
-      <p>${badges}</p>
-    </div>
+    <div><p class="eyebrow">${active ? `${active.emoji} ${active.name}` : "NATSUMI PLAYER"} ${state.demo ? " DEMO" : ""}</p>
+      <h1>${state.me?.globalName || state.me?.username || profile.userId}</h1><p>${badges}</p></div>
     <div class="level-badge">Lv.${profile.level}</div>
     <div class="stats">
       <div class="stat"><span>경험치</span><b>${fmt(profile.xp)} / ${fmt(profile.needed)}</b></div>
@@ -277,8 +258,7 @@ function renderProfile() {
     </div>
     <div class="progress"><span style="width:${profile.progress}%"></span></div>
     <p>진행률 ${profile.progress}% · <a target="_blank" rel="noreferrer" href="${rankUrl(profile.guildId, profile.userId)}">랭크카드 열기</a></p>
-    <h3>활성 칭호 선택</h3>
-    <div class="shop-tabs">${titleOptions}</div>`;
+    <h3>활성 칭호 선택</h3><div class="shop-tabs">${titleOptions}</div>`;
   $("#rankCardLink").href = rankUrl(profile.guildId, profile.userId);
   document.querySelectorAll("[data-title]").forEach((button) => button.addEventListener("click", selectTitle));
 }
@@ -310,12 +290,44 @@ async function loadProfile() {
     state.demo = false;
   } catch {
     const guildId = state.config.defaultGuildId || "demo-guild";
-    const userId = currentUserId();
-    state.profile = demoProfile(guildId, userId);
+    state.profile = demoProfile(guildId, currentUserId());
     state.demo = true;
   }
   renderProfile();
   renderShop();
+  await loadBag();
+}
+
+async function loadBag() {
+  if (!state.me) {
+    renderBag();
+    return;
+  }
+  try {
+    state.bag = await api("/api/bag/me");
+  } catch {
+    state.bag = null;
+  }
+  renderBag();
+}
+
+function renderBag() {
+  const area = $("#arcadeInventory");
+  if (!area) return;
+  if (!state.me) {
+    area.textContent = "로그인 후 가방과 도감을 볼 수 있어요.";
+    return;
+  }
+  const bag = state.bag || { anime: [], fishing: [], collection: { anime: [], fishing: [] } };
+  if (state.arcadeTab === "collection") {
+    const anime = bag.collection?.anime || [];
+    const fish = bag.collection?.fishing || [];
+    area.innerHTML = `<div class="pixel-list"><b>도감 수집률</b><p>애니굿즈 ${anime.length}종 · 낚시 ${fish.length}종</p>${[...anime, ...fish].slice(0, 18).map((name) => `<span>${name}</span>`).join("") || "<small>아직 수집 기록이 없어요.</small>"}</div>`;
+    return;
+  }
+  const animeRows = (bag.anime || []).slice(0, 12).map((item) => `<span>${item.name} x${item.count}</span>`).join("");
+  const fishRows = (bag.fishing || []).filter((item) => item.count > 0).map((item) => `<span>${item.name} x${item.count}</span>`).join("");
+  area.innerHTML = `<div class="pixel-list"><b>가방</b>${animeRows || fishRows ? `${animeRows}${fishRows}` : "<small>아직 가방이 비어 있어요.</small>"}</div>`;
 }
 
 async function buyItem(event) {
@@ -325,79 +337,103 @@ async function buyItem(event) {
   const key = event.currentTarget.dataset.key;
   try {
     const data = await api("/api/buy", { method: "POST", body: JSON.stringify({ userId, itemType, key }) });
-    alert(data.message || "구매 완료!");
+    showPixelResult({ title: "SHOP OK", lines: [data.message || "구매 완료"] });
     await loadProfile();
-  } catch {
-    const list = itemType === "title" ? demoShop.titles : demoShop.badges;
-    const item = list.find((entry) => entry.key === key);
-    const inv = getInv(userId);
-    const field = itemType === "title" ? "titles" : "badges";
-    if (inv[field].includes(key)) return alert("이미 가지고 있는 아이템이에요.");
-    if (inv.money < item.price) return alert(`금전 부족! 필요 ${fmt(item.price)}, 보유 ${fmt(inv.money)}`);
-    inv.money -= item.price;
-    inv[field].push(key);
-    if (itemType === "title" && !inv.activeTitle) inv.activeTitle = key;
-    saveInv(userId, inv);
-    alert(`${item.name} 구매 완료!`);
-    await loadProfile();
+  } catch (error) {
+    showPixelResult({ title: "SHOP FAIL", lines: [error.message], tone: "bad" });
   }
 }
 
 async function selectTitle(event) {
   if (!requireLogin()) return;
-  const userId = currentUserId();
   const key = event.currentTarget.dataset.title;
   try {
-    await api("/api/title/select", { method: "POST", body: JSON.stringify({ userId, key }) });
-  } catch {
-    const inv = getInv(userId);
-    if (!inv.titles.includes(key)) return alert("보유하지 않은 칭호예요.");
-    inv.activeTitle = key;
-    saveInv(userId, inv);
+    await api("/api/title/select", { method: "POST", body: JSON.stringify({ key }) });
+    await loadProfile();
+  } catch (error) {
+    showPixelResult({ title: "TITLE FAIL", lines: [error.message], tone: "bad" });
   }
-  await loadProfile();
 }
 
 async function playGame() {
   if (!requireLogin()) return;
+  if (state.game === "mole") return startMoleGame();
   const key = state.game;
   const game = gameDefs[key];
-  const userId = currentUserId();
   const bet = Number($("#betInput").value || 1000);
   setPlaying(true);
-  renderGameStage(key, game.icon, true);
-  $("#gameResult").textContent = `${game.name} 진행 중...\n나츠미가 결과를 뽑고 있어요.`;
+  renderGameStage(key, true);
   try {
-    await new Promise((resolve) => setTimeout(resolve, 650));
-    const data = await api(game.api, { method: "POST", body: JSON.stringify({ userId, bet, score: key === "mole" ? Math.floor(Math.random() * 80) + 20 : undefined, difficulty: "medium" }) });
-    renderGameStage(key, game.icon, false);
-    $("#gameResult").textContent = formatGameResult(data);
+    await new Promise((resolve) => setTimeout(resolve, 700));
+    const data = await api(game.api, { method: "POST", body: JSON.stringify({ bet, rollCount: key === "anime" ? 1 : undefined }) });
+    renderGameStage(key, false);
+    showGameResult(data);
     await loadProfile();
-  } catch {
-    const inv = getInv(userId);
-    const delta = demoGameDelta(key, bet);
-    inv.money = Math.max(0, inv.money + delta);
-    saveInv(userId, inv);
-    renderGameStage(key, game.icon, false);
-    $("#gameResult").textContent = `${game.name} 데모 결과\n변동 금전: ${delta >= 0 ? "+" : ""}${fmt(delta)}\n현재 금전: ${fmt(inv.money)}`;
-    await loadProfile();
+  } catch (error) {
+    renderGameStage(key, false);
+    showPixelResult({ title: "ERROR", lines: [error.message], tone: "bad" });
   } finally {
     setPlaying(false);
   }
 }
 
-function formatGameResult(data) {
-  if (data.reels) return `${data.reels.join(" | ")}\n결과: ${data.result}\n변동 금전: ${data.delta >= 0 ? "+" : ""}${fmt(data.delta)}\n현재 금전: ${fmt(data.money)}`;
-  return `${data.item || data.game}\n변동 금전: ${data.delta >= 0 ? "+" : ""}${fmt(data.delta)}\n현재 금전: ${fmt(data.money)}`;
+function showGameResult(data) {
+  const delta = Number(data.delta || 0);
+  const tone = delta >= 0 ? "good" : "bad";
+  const lines = [];
+  if (data.reels) lines.push(data.reels.join(" / "));
+  if (data.item) lines.push(data.item);
+  if (data.results) lines.push(...data.results.slice(0, 5).map((item) => `[${item.category}] ${item.name}`));
+  if (data.score !== undefined) lines.push(`점수 ${data.score}`);
+  lines.push(`금전 ${delta >= 0 ? "+" : ""}${fmt(delta)}`);
+  if (data.money !== undefined) lines.push(`현재 ${fmt(data.money)}`);
+  showPixelResult({ title: data.result || data.game || "RESULT", lines, tone });
 }
 
-function demoGameDelta(key, bet) {
-  if (key === "fishing") return 800;
-  if (key === "mole") return 12000;
-  const roll = Math.random();
-  if (roll > .75) return Math.floor(bet * 3);
-  if (roll > .45) return Math.floor(bet * 1.2);
-  return -bet;
+function startMoleGame() {
+  if (state.mole?.running) return;
+  setPlaying(true);
+  renderGameStage("mole", true);
+  const cells = [...document.querySelectorAll(".mole-cell")];
+  let score = 0;
+  let timeLeft = 8000;
+  let active = -1;
+  state.mole = { running: true };
+  const setActive = () => {
+    cells.forEach((cell) => cell.classList.remove("active"));
+    active = Math.floor(Math.random() * cells.length);
+    cells[active].classList.add("active");
+    cells[active].textContent = "HIT";
+  };
+  const hit = (event) => {
+    const idx = Number(event.currentTarget.dataset.mole);
+    if (idx !== active) return;
+    score += 1;
+    $("#moleScore").textContent = `${score} HIT`;
+    setActive();
+  };
+  cells.forEach((cell) => cell.addEventListener("click", hit));
+  setActive();
+  const speed = setInterval(setActive, 540);
+  const clock = setInterval(() => {
+    timeLeft -= 100;
+    $("#moleTimer").textContent = (timeLeft / 1000).toFixed(1);
+  }, 100);
+  setTimeout(async () => {
+    clearInterval(speed);
+    clearInterval(clock);
+    cells.forEach((cell) => cell.removeEventListener("click", hit));
+    state.mole = null;
+    try {
+      const data = await api("/api/games/mole", { method: "POST", body: JSON.stringify({ score, difficulty: "medium" }) });
+      showGameResult(data);
+      await loadProfile();
+    } catch (error) {
+      showPixelResult({ title: "MOLE FAIL", lines: [error.message], tone: "bad" });
+    } finally {
+      setPlaying(false);
+    }
+  }, 8000);
 }
 
 async function logout() {
@@ -410,26 +446,17 @@ async function applySupportRequest() {
   const name = $("#supportName")?.value?.trim() || "";
   const amount = Number($("#supportAmount")?.value || 0);
   const memo = $("#supportMemo")?.value?.trim() || "";
-
   if (!name || !amount) {
     result.textContent = "입금자명과 후원 금액을 적어줘.";
     return;
   }
-
   result.textContent = "후원 인증 요청을 저장하는 중...";
   try {
-    const data = await api("/api/support/apply", {
-      method: "POST",
-      body: JSON.stringify({ name, amount, memo })
-    });
+    const data = await api("/api/support/apply", { method: "POST", body: JSON.stringify({ name, amount, memo }) });
     result.textContent = data.message || "후원 인증 요청을 저장했어.";
-  } catch {
-    const rows = JSON.parse(localStorage.getItem("natsumi-support-requests") || "[]");
-    rows.unshift({ name, amount, memo, createdAt: new Date().toISOString() });
-    localStorage.setItem("natsumi-support-requests", JSON.stringify(rows.slice(0, 20)));
-    result.textContent = "서버 저장은 실패했지만 이 브라우저에 임시 저장했어. 잠시 뒤 다시 시도해줘.";
+  } catch (error) {
+    result.textContent = error.message;
   }
-
   if (state.config.donationUrl) window.open(state.config.donationUrl, "_blank", "noopener,noreferrer");
 }
 
@@ -453,25 +480,49 @@ function initTheme() {
   });
 }
 
+function bindUiEvents() {
+  if (window.__natsumiUiBound) return;
+  window.__natsumiUiBound = true;
+  $("#loadBtn")?.addEventListener("click", loadProfile);
+  $("#playGameBtn")?.addEventListener("click", playGame);
+  $("#supportApplyBtn")?.addEventListener("click", applySupportRequest);
+  $("#logoutBtn")?.addEventListener("click", logout);
+  $("#loginBtn")?.addEventListener("click", (event) => {
+    event.preventDefault();
+    goLogin();
+  });
+  document.querySelectorAll(".nav-btn").forEach((button) => button.addEventListener("click", (event) => {
+    event.preventDefault();
+    event.stopPropagation();
+    showView(button.dataset.view);
+    closeMenu();
+  }, { capture: true }));
+  document.querySelectorAll(".tab[data-tab]").forEach((button) => button.addEventListener("click", () => {
+    document.querySelectorAll(".tab[data-tab]").forEach((tab) => tab.classList.remove("active"));
+    button.classList.add("active");
+    state.tab = button.dataset.tab;
+    renderShop();
+  }));
+  document.querySelectorAll("[data-arcade-tab]").forEach((button) => button.addEventListener("click", () => {
+    document.querySelectorAll("[data-arcade-tab]").forEach((tab) => tab.classList.remove("active"));
+    button.classList.add("active");
+    state.arcadeTab = button.dataset.arcadeTab;
+    renderBag();
+  }));
+}
+
 async function init() {
   initTheme();
   state.config = await loadServerConfig(getConfig());
   bindUiEvents();
   $("#loginBtn").href = authUrl();
-  $("#loginBtn").addEventListener("click", (event) => {
-    event.preventDefault();
-    goLogin();
-  });
   if (state.config.donationEnabled) {
     $("#donateLink").href = state.config.donationUrl;
     $("#donateLink").classList.remove("hidden");
   }
-  if (!state.config.discordLoginEnabled) {
-    $("#loginBtn").title = "Discord 개발자 포털의 OAuth2 Redirect URL과 서버 환경변수가 필요해요.";
-  }
   await loadMe();
   try {
-    state.shop = normalizeShop(await api("/api/shop"));
+    state.shop = await api("/api/shop");
   } catch {
     state.shop = demoShop;
     state.demo = true;
@@ -483,6 +534,7 @@ async function init() {
   } else {
     $("#profileArea").className = "empty";
     $("#profileArea").textContent = "Discord 로그인 후 내 레벨, 경험치, 금전, 랭크카드를 불러올 수 있어요.";
+    renderBag();
   }
 }
 

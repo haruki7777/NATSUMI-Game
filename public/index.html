@@ -83,7 +83,14 @@
             <input id="betInput" type="number" min="100" value="1000" inputmode="numeric" aria-label="베팅 금액" />
             <button id="playGameBtn" type="button">게임 시작</button>
           </div>
-          <div id="gameResult" class="result-box">게임 결과가 여기에 표시됩니다.</div>
+          <div id="gameResult" class="result-box hidden" aria-live="polite">게임 결과가 화면에 표시됩니다.</div>
+          <div class="arcade-inventory">
+            <div class="shop-tabs arcade-tabs">
+              <button class="tab active" data-arcade-tab="bag" type="button">가방</button>
+              <button class="tab" data-arcade-tab="collection" type="button">도감</button>
+            </div>
+            <div id="arcadeInventory" class="pixel-inventory">로그인 후 게임 기록을 불러올 수 있어요.</div>
+          </div>
         </div>
       </div>
     </section>
