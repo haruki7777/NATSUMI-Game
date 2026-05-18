@@ -1,0 +1,60 @@
+:root {
+  --natsumi-bg: url("data:image/webp;base64,UklGRlpmAABXRUJQVlA4IE5mAABQbAKdASoABdACPsFgqlEnpS01oiM5KAgBmrEer6yfoYY1ahoxOCjG2Imf+Wv/ef+6MoeQAAP73sRUPGVf5kfvFqboUXpvtBpf26nb4g/E88y3TtLv4pOHmvdz5vVE++RjbVgr4qIOuP8n3P8KQ/kvro88OBj91WMdFXfJP6reTztx7+/e7yZhzheFSSy5oZ6VFjvbv2VydA3UHXgY3nZi+tPm8NX1vnLoDgbvp/d/7L/vqqB8PXKfbP5tNAR2nrbeN0tf6nq8LVtfS0P0P9+ejCyd0OE9nsD/7L6XvYre/p6h39d/tgn+ud9c9vNqV3kX1XMb7rG3SXXeEUnrHDqfDEzIDYK44QegibTo6yl/2DvngnT7eK6c/bd/oSRHt5X379Yz4d5Lu8a8OHuuiQ8w4Y4Bd5C2/nt+oVPp7tB84/sN/IKrc8mWXzV+BLe16Xm9p+TvtO/mvYufL9/ebX0/urf0zvO81+ef6Hh1A9jNd/UF/joiK2xgkkw7Sguzvf9f8R6cdl++qfmuXj6Pv3fBKE/Gb/nD/ujE12VG+p6XvCojQOfo87j0INjzoD30tud/P0ZG6fzP+hb/eLzfr9jn++fezo/0k33TiUHrH368d8nQ4akAwdIG6b11znzYwC9STg/3TGLz4jtXL3ER7l9LdfvDFYmlz/tYQJ+70vCx/rP/vf4UsPeLUI17QxXefoZaFTn38R/PPgk6+VHqm9++fLT/vD2+h2+K7iP84uP7355/tR5gVjEft3B2+/+v9R+gE/DklPFU3Jx1H/tuj+x+GH4A8u/kdrPkFqQe9lXls3Nz6R5Lrqp8s/3YoPQ85/iubj+PZB9+mb5cPNwP/tNuZ+J/7OL47xy0tsUDM9Wc2d9lqEn/o0qlv8/XiI/nr9GvGzqOXL3Kx9XtcLZ5GZ4p1T2bVLPg1b13mTk13vmhvP4uwFr3u/71wSXZkMIOH1d6m2b7f2HmzOF0ODpB0K4f0g13r/vvQ+UvPPHX60mWfgfkCbU7/5VYfJfp+OfP07hQ7T9q8O8B/2yfcAA===");
+}
+
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: -2;
+  background:
+    linear-gradient(115deg, rgba(7, 5, 12, .96) 0%, rgba(15, 8, 21, .78) 43%, rgba(20, 9, 18, .52) 100%),
+    var(--natsumi-bg) center / cover no-repeat;
+}
+
+body::after {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, .05), rgba(255, 255, 255, 0) 32%),
+    repeating-linear-gradient(90deg, rgba(255, 255, 255, .035) 0 1px, transparent 1px 90px);
+  opacity: .52;
+}
+
+.hero-card {
+  position: relative;
+  overflow: hidden;
+  background:
+    linear-gradient(90deg, rgba(14, 8, 20, .92), rgba(14, 8, 20, .58), rgba(14, 8, 20, .22)),
+    var(--natsumi-bg) center / cover no-repeat;
+}
+
+.hero-card::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: linear-gradient(180deg, transparent 0%, rgba(0, 0, 0, .28) 100%);
+}
+
+.hero-card > * {
+  position: relative;
+  z-index: 1;
+}
+
+@media (max-width: 720px) {
+  body::before {
+    background:
+      linear-gradient(180deg, rgba(7, 5, 12, .9) 0%, rgba(11, 7, 16, .74) 42%, rgba(11, 7, 16, .96) 100%),
+      var(--natsumi-bg) 64% center / cover no-repeat;
+  }
+
+  .hero-card {
+    background:
+      linear-gradient(180deg, rgba(10, 6, 15, .52) 0%, rgba(10, 6, 15, .86) 58%, rgba(10, 6, 15, .96) 100%),
+      var(--natsumi-bg) 64% center / cover no-repeat;
+  }
+}

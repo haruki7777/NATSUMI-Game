@@ -1,0 +1,55 @@
+.drawer-menu {
+  position: fixed;
+  top: 0;
+  right: 0;
+  z-index: 80;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  width: min(360px, 90vw);
+  height: 100svh;
+  padding: 18px;
+  border-left: 1px solid var(--line);
+  background: rgba(13, 8, 18, .96);
+  box-shadow: -24px 0 80px rgba(0, 0, 0, .42);
+  transform: translateX(105%);
+  transition: transform .22s ease;
+  backdrop-filter: blur(18px);
+}
+
+.drawer-menu.open { transform: translateX(0); }
+.drawer-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  font-size: 20px;
+}
+.drawer-menu .nav-btn {
+  width: 100%;
+  text-align: left;
+}
+.drawer-menu .primary-link, .drawer-menu .ghost {
+  width: 100%;
+  text-align: center;
+}
+.menu-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 70;
+  background: rgba(0, 0, 0, .58);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity .18s ease;
+}
+.menu-backdrop.open {
+  opacity: 1;
+  pointer-events: auto;
+}
+body.menu-open { overflow: hidden; }
+
+@media (min-width: 1080px) {
+  .drawer-menu {
+    width: min(390px, 34vw);
+  }
+}
