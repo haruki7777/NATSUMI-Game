@@ -67,7 +67,38 @@ function pick(list) { return list[Math.floor(Math.random() * list.length)]; }
 function currentUserId(req) { return req.session?.discordUser?.id || req.body?.userId || req.params?.userId || ''; }
 async function ensureMoney(userId) { let data = await Money.findOne({ userid: userId }); if (!data) data = await Money.create({ userid: userId, money: 0, date: Date.now() }); return data; }
 async function addMoney(userId, delta) { await Money.updateOne({ userid: userId }, { $inc: { money: delta }, $set: { date: Date.now() } }, { upsert: true }); return ensureMoney(userId); }
-async function getProfile(guildId, userId) { const [levelData, moneyData, attendanceData, inv, titles, badges] = await Promise.all([LevelSystem.findOne({ GuildID: guildId, UserID: userId }).lean(), Money.findOne({ userid: userId }).lean(), Attendance.findOne({ userid: userId }).lean(), Inventory.findOne({ userId }).lean(), Title.find().lean(), Badge.find().lean()]); const level = toInt(levelData?.level, 1); const xp = toInt(levelData?.xp, 0); const needed = calculateXP(level); const ownedTitleMap = new Set(inv?.titles || []); const ownedBadgeMap = new Set(inv?.badges || []); return { guildId, userId, level, xp, needed, progress: needed ? Math.min(100, Math.round((xp / needed) * 1000) / 10) : 0, money: toInt(moneyData?.money, 0), attendance: toInt(attendanceData?.count, 0), activeTitle: inv?.activeTitle || '', ownedTitles: titles.filter((t) => ownedTitleMap.has(t.key)), ownedBadges: badges.filter((b) => ownedBadgeMap.has(b.key)) }; }
+async function getProfile(guildId, userId) {
+  const levelQuery = guildId && guildId !== 'demo-guild'
+    ? { GuildID: guildId, UserID: userId }
+    : { UserID: userId };
+  const [levelData, moneyData, attendanceData, inv, titles, badges] = await Promise.all([
+    LevelSystem.findOne(levelQuery).sort({ level: -1, xp: -1 }).lean(),
+    Money.findOne({ userid: userId }).lean(),
+    Attendance.findOne({ userid: userId }).lean(),
+    Inventory.findOne({ userId }).lean(),
+    Title.find().lean(),
+    Badge.find().lean()
+  ]);
+  const resolvedGuildId = guildId && guildId !== 'demo-guild' ? guildId : (levelData?.GuildID || DEFAULT_GUILD_ID || 'global');
+  const level = toInt(levelData?.level, 1);
+  const xp = toInt(levelData?.xp, 0);
+  const needed = calculateXP(level);
+  const ownedTitleMap = new Set(inv?.titles || []);
+  const ownedBadgeMap = new Set(inv?.badges || []);
+  return {
+    guildId: resolvedGuildId,
+    userId,
+    level,
+    xp,
+    needed,
+    progress: needed ? Math.min(100, Math.round((xp / needed) * 1000) / 10) : 0,
+    money: toInt(moneyData?.money, 0),
+    attendance: toInt(attendanceData?.count, 0),
+    activeTitle: inv?.activeTitle || '',
+    ownedTitles: titles.filter((t) => ownedTitleMap.has(t.key)),
+    ownedBadges: badges.filter((b) => ownedBadgeMap.has(b.key))
+  };
+}
 
 app.get('/auth/discord', (req, res) => { if (!DISCORD_CLIENT_ID) return res.status(500).send('DISCORD_CLIENT_ID가 필요해.'); const state = Math.random().toString(36).slice(2); req.session.oauthState = state; const params = new URLSearchParams({ client_id: DISCORD_CLIENT_ID, redirect_uri: DISCORD_REDIRECT_URI, response_type: 'code', scope: 'identify', state }); res.redirect(`https://discord.com/api/oauth2/authorize?${params.toString()}`); });
 app.get('/auth/discord/callback', async (req, res) => { try { if (!req.query.code || req.query.state !== req.session.oauthState) return res.status(400).send('OAuth state가 맞지 않아.'); const tokenRes = await fetch('https://discord.com/api/oauth2/token', { method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, body: new URLSearchParams({ client_id: DISCORD_CLIENT_ID, client_secret: DISCORD_CLIENT_SECRET, grant_type: 'authorization_code', code: String(req.query.code), redirect_uri: DISCORD_REDIRECT_URI }) }); const token = await tokenRes.json(); if (!token.access_token) return res.status(400).json(token); const userRes = await fetch('https://discord.com/api/users/@me', { headers: { Authorization: `Bearer ${token.access_token}` } }); const user = await userRes.json(); req.session.discordUser = { id: user.id, username: user.username, globalName: user.global_name, avatar: user.avatar }; res.redirect('/'); } catch (err) { console.error(err); res.status(500).send('Discord 로그인 실패'); } });
@@ -84,6 +115,7 @@ app.get('/api/config', (req, res) => res.json({
   discordRedirectUri: DISCORD_REDIRECT_URI,
 }));
 app.get('/api/shop', async (req, res) => { const [titles, badges] = await Promise.all([Title.find().sort({ price: 1 }).lean(), Badge.find().sort({ price: 1 }).lean()]); res.json({ titles, badges }); });
+app.get('/api/profile/me', async (req, res) => { if (!req.session?.discordUser?.id) return res.status(401).json({ error: 'Discord 로그인이 필요해.' }); res.json(await getProfile(DEFAULT_GUILD_ID, req.session.discordUser.id)); });
 app.get('/api/profile/:guildId/:userId', async (req, res) => res.json(await getProfile(req.params.guildId, req.params.userId)));
 app.get('/api/balance/:userId', async (req, res) => { const data = await ensureMoney(req.params.userId); res.json({ userId: req.params.userId, money: toInt(data.money, 0) }); });
 app.get('/api/leaderboard', async (req, res) => { const rows = await Money.find().sort({ money: -1 }).limit(20).lean(); res.json({ users: rows.map((r, i) => ({ rank: i + 1, userId: r.userid, money: toInt(r.money, 0) })) }); });

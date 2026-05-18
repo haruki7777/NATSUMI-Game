@@ -121,6 +121,12 @@ function goLogin() {
   window.location.assign(authUrl());
 }
 
+function requireLogin() {
+  if (state.me) return true;
+  goLogin();
+  return false;
+}
+
 function normalizeShop(shop) {
   if (!shop?.titles?.length) return demoShop;
   return shop;
@@ -238,16 +244,13 @@ async function loadMe() {
 }
 
 async function loadProfile() {
-  if (!state.me) {
-    goLogin();
-    return;
-  }
-  const guildId = state.config.defaultGuildId || "demo-guild";
-  const userId = currentUserId();
+  if (!requireLogin()) return;
   try {
-    state.profile = await api(`/api/profile/${guildId}/${userId}`);
+    state.profile = await api("/api/profile/me");
     state.demo = false;
   } catch {
+    const guildId = state.config.defaultGuildId || "demo-guild";
+    const userId = currentUserId();
     state.profile = demoProfile(guildId, userId);
     state.demo = true;
   }
@@ -256,6 +259,7 @@ async function loadProfile() {
 }
 
 async function buyItem(event) {
+  if (!requireLogin()) return;
   const userId = currentUserId();
   const itemType = event.currentTarget.dataset.buy;
   const key = event.currentTarget.dataset.key;
@@ -280,6 +284,7 @@ async function buyItem(event) {
 }
 
 async function selectTitle(event) {
+  if (!requireLogin()) return;
   const userId = currentUserId();
   const key = event.currentTarget.dataset.title;
   try {
@@ -294,6 +299,7 @@ async function selectTitle(event) {
 }
 
 async function playGame() {
+  if (!requireLogin()) return;
   const key = state.game;
   const game = gameDefs[key];
   const userId = currentUserId();
@@ -404,7 +410,12 @@ async function init() {
   }
   renderShop();
   renderGames();
-  await loadProfile();
+  if (state.me) {
+    await loadProfile();
+  } else {
+    $("#profileArea").className = "empty";
+    $("#profileArea").textContent = "Discord 로그인 후 내 레벨, 경험치, 금전, 랭크카드를 불러올 수 있어요.";
+  }
   $("#loadBtn").addEventListener("click", loadProfile);
   $("#playGameBtn").addEventListener("click", playGame);
   $("#supportApplyBtn")?.addEventListener("click", applySupportRequest);

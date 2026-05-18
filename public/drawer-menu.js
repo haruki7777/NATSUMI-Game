@@ -29,7 +29,9 @@
     openBtn.addEventListener("click", open);
     closeBtn?.addEventListener("click", close);
     backdrop.addEventListener("click", close);
-    menu.querySelectorAll(".nav-btn").forEach((btn) => btn.addEventListener("click", () => setTimeout(close, 80)));
+    menu.querySelectorAll(".nav-btn").forEach((btn) => btn.addEventListener("click", () => {
+      if (btn.dataset.view) close();
+    }));
     window.addEventListener("keydown", (event) => {
       if (event.key === "Escape") close();
     });

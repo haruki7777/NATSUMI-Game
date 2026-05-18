@@ -17,6 +17,16 @@
   backdrop-filter: blur(18px);
 }
 
+:root[data-theme="light"] .drawer-menu {
+  background: rgba(255, 250, 247, .96);
+  color: var(--text);
+  box-shadow: -24px 0 80px rgba(86, 42, 66, .18);
+}
+
+:root[data-theme="light"] .menu-backdrop {
+  background: rgba(87, 45, 68, .32);
+}
+
 .drawer-menu.open { transform: translateX(0); }
 .drawer-head {
   display: flex;
