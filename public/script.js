@@ -2,6 +2,7 @@ let state = { config: null, shop: null, profile: null, tab: "titles", demo: fals
 const $ = (query) => document.querySelector(query);
 const fmt = (value) => Number(value || 0).toLocaleString("ko-KR");
 const storeKey = "natsumi-game-demo";
+const themeKey = "natsumi-game-theme";
 
 const gameDefs = {
   slot: { name: "슬롯머신", icon: "777", desc: "같은 그림을 맞춰 금전을 노려보세요.", api: "/api/games/slot" },
@@ -110,6 +111,14 @@ function currentUserId() {
 
 function rankUrl(guildId, userId) {
   return state.config.apiBase ? `${state.config.apiBase}/rank-card/${guildId}/${userId}` : "#rankView";
+}
+
+function authUrl() {
+  return `${state.config.apiBase || ""}/auth/discord`;
+}
+
+function goLogin() {
+  window.location.assign(authUrl());
 }
 
 function normalizeShop(shop) {
@@ -229,6 +238,10 @@ async function loadMe() {
 }
 
 async function loadProfile() {
+  if (!state.me) {
+    goLogin();
+    return;
+  }
   const guildId = state.config.defaultGuildId || "demo-guild";
   const userId = currentUserId();
   try {
@@ -347,8 +360,34 @@ async function applySupportRequest() {
   if (state.config.donationUrl) window.open(state.config.donationUrl, "_blank", "noopener,noreferrer");
 }
 
+function applyTheme(theme) {
+  const normalized = theme === "light" ? "light" : "dark";
+  document.documentElement.dataset.theme = normalized;
+  localStorage.setItem(themeKey, normalized);
+  const button = $("#themeToggle");
+  if (button) {
+    button.textContent = normalized === "light" ? "다크 모드" : "화이트 모드";
+    button.setAttribute("aria-pressed", String(normalized === "light"));
+  }
+}
+
+function initTheme() {
+  const saved = localStorage.getItem(themeKey);
+  const preferred = window.matchMedia?.("(prefers-color-scheme: light)")?.matches ? "light" : "dark";
+  applyTheme(saved || preferred);
+  $("#themeToggle")?.addEventListener("click", () => {
+    applyTheme(document.documentElement.dataset.theme === "light" ? "dark" : "light");
+  });
+}
+
 async function init() {
+  initTheme();
   state.config = await loadServerConfig(getConfig());
+  $("#loginBtn").href = authUrl();
+  $("#loginBtn").addEventListener("click", (event) => {
+    event.preventDefault();
+    goLogin();
+  });
   if (state.config.donationEnabled) {
     $("#donateLink").href = state.config.donationUrl;
     $("#donateLink").classList.remove("hidden");

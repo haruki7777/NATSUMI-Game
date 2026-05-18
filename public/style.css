@@ -9,6 +9,27 @@
   --cyan: #62d9ff;
   --line: rgba(255, 255, 255, .16);
   --shadow: 0 24px 70px rgba(0, 0, 0, .34);
+  --topbar-bg: rgba(11, 7, 16, .78);
+  --input-bg: rgba(7, 5, 12, .84);
+  --soft-card: rgba(0, 0, 0, .22);
+  --hero-overlay: linear-gradient(90deg, rgba(14, 8, 20, .92), rgba(14, 8, 20, .58), rgba(14, 8, 20, .22));
+}
+
+:root[data-theme="light"] {
+  --bg: #fff8f5;
+  --panel: rgba(255, 252, 250, .84);
+  --panel-strong: rgba(255, 247, 242, .94);
+  --text: #2a1720;
+  --muted: #674d5a;
+  --accent: #ff7a1a;
+  --pink: #f23f94;
+  --cyan: #1594b7;
+  --line: rgba(94, 47, 71, .18);
+  --shadow: 0 24px 70px rgba(86, 42, 66, .18);
+  --topbar-bg: rgba(255, 249, 246, .76);
+  --input-bg: rgba(255, 255, 255, .82);
+  --soft-card: rgba(255, 255, 255, .42);
+  --hero-overlay: linear-gradient(90deg, rgba(255, 248, 245, .82), rgba(255, 235, 228, .45), rgba(255, 210, 226, .16));
 }
 
 * { box-sizing: border-box; }
@@ -34,7 +55,7 @@ a { color: inherit; text-decoration: none; }
   justify-content: space-between;
   min-height: 72px;
   padding: 12px clamp(14px, 4vw, 56px);
-  background: rgba(11, 7, 16, .78);
+  background: var(--topbar-bg);
   border-bottom: 1px solid var(--line);
   backdrop-filter: blur(18px);
 }
@@ -97,6 +118,7 @@ a { color: inherit; text-decoration: none; }
 }
 .login-box { display: grid; gap: 10px; color: var(--muted); }
 .hidden { display: none !important; }
+.theme-toggle { border-color: rgba(255, 138, 42, .42); }
 
 .layout {
   width: min(1220px, 100%);
@@ -150,7 +172,7 @@ a { color: inherit; text-decoration: none; }
   place-items: center;
   text-align: center;
   padding: 24px;
-  background: rgba(0, 0, 0, .26);
+  background: var(--soft-card);
 }
 .mascot {
   width: clamp(108px, 13vw, 156px);
@@ -225,7 +247,7 @@ a { color: inherit; text-decoration: none; }
   border: 1px solid var(--line);
   border-radius: 16px;
   padding: 14px;
-  background: rgba(0, 0, 0, .22);
+  background: var(--soft-card);
 }
 .stat span { color: var(--muted); }
 .stat b {
@@ -239,7 +261,7 @@ a { color: inherit; text-decoration: none; }
   overflow: hidden;
   border: 1px solid var(--line);
   border-radius: 999px;
-  background: rgba(0, 0, 0, .35);
+  background: color-mix(in srgb, var(--bg) 64%, black 36%);
 }
 .progress span {
   display: block;
@@ -277,7 +299,7 @@ a { color: inherit; text-decoration: none; }
   border: 1px solid var(--line);
   border-radius: 22px;
   padding: clamp(16px, 3vw, 24px);
-  background: rgba(0, 0, 0, .22);
+  background: var(--soft-card);
 }
 .game-art {
   min-height: 96px;
@@ -299,7 +321,7 @@ a { color: inherit; text-decoration: none; }
   width: 100%;
   border: 1px solid var(--line);
   border-radius: 14px;
-  background: rgba(7, 5, 12, .84);
+  background: var(--input-bg);
   color: var(--text);
   padding: 13px 14px;
 }
@@ -309,7 +331,7 @@ a { color: inherit; text-decoration: none; }
   border: 1px dashed var(--line);
   border-radius: 18px;
   padding: 16px;
-  background: rgba(0, 0, 0, .2);
+  background: var(--soft-card);
   color: var(--muted);
   line-height: 1.55;
   white-space: pre-wrap;
@@ -332,7 +354,7 @@ a { color: inherit; text-decoration: none; }
   border: 1px solid var(--line);
   border-radius: 20px;
   padding: 16px;
-  background: rgba(0, 0, 0, .24);
+  background: var(--soft-card);
 }
 .item .emoji { font-size: 34px; }
 .item h3 { margin: 0; font-size: 19px; }
