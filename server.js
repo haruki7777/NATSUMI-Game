@@ -124,6 +124,7 @@ const DashboardSettings = model('DashboardSettings', new Schema({
     ai: { type: Boolean, default: true },
     shop: { type: Boolean, default: true },
     emojiUpscale: { type: Boolean, default: false },
+    level: { type: Boolean, default: false },
   },
   welcome: {
     enabled: { type: Boolean, default: false },
@@ -258,17 +259,21 @@ async function fetchBotGuildChannels(guildId) {
     type: channel.type === 0 ? 'text' : channel.type === 2 ? 'voice' : channel.type === 4 ? 'category' : 'other',
   })).filter((channel) => channel.type !== 'other');
 }
-async function fetchKoreanbotsServers() {
-  if (!KOREANBOTS_BOT_ID) return null;
+async function fetchKoreanbotsStats() {
+  if (!KOREANBOTS_BOT_ID) return { servers: null, votes: null };
   try {
     const res = await fetch(`https://koreanbots.dev/api/v2/bots/${KOREANBOTS_BOT_ID}`, {
       headers: KOREANBOTS_TOKEN ? { Authorization: KOREANBOTS_TOKEN } : {},
     });
-    if (!res.ok) return null;
+    if (!res.ok) return { servers: null, votes: null };
     const data = await res.json();
-    return data?.data?.servers ?? data?.servers ?? null;
+    const bot = data?.data || data;
+    return {
+      servers: bot?.servers ?? bot?.server_count ?? null,
+      votes: bot?.votes ?? bot?.vote_count ?? null,
+    };
   } catch {
-    return null;
+    return { servers: null, votes: null };
   }
 }
 async function getProfile(guildId, userId) {
@@ -323,13 +328,19 @@ app.get('/api/config', (req, res) => res.json({
   gameCenterUrl: SITE_URL,
 }));
 app.get('/api/stats', async (req, res) => {
-  const [koreanbotsServers, botGuilds] = await Promise.all([
-    fetchKoreanbotsServers(),
+  const [koreanbots, botGuilds] = await Promise.all([
+    fetchKoreanbotsStats(),
     DISCORD_BOT_TOKEN ? fetch('https://discord.com/api/v10/users/@me/guilds', { headers: { Authorization: `Bot ${DISCORD_BOT_TOKEN}` } }).then((r) => r.ok ? r.json() : []).catch(() => []) : [],
   ]);
+  const discordServers = Array.isArray(botGuilds) ? botGuilds.length : null;
+  const servers = koreanbots.servers ?? discordServers;
   res.json({
-    botServers: Array.isArray(botGuilds) ? botGuilds.length : null,
-    koreanbotsServers,
+    servers,
+    votes: koreanbots.votes,
+    botServers: discordServers,
+    koreanbotsServers: koreanbots.servers,
+    discord: { servers: discordServers },
+    koreanbots,
   });
 });
 app.get('/api/dashboard/session', (req, res) => res.json({ user: req.session?.discordUser || null, isOwner: isOwner(req) }));
