@@ -13,13 +13,56 @@ const PORT = process.env.PORT || 3000;
 const DEFAULT_GUILD_ID = process.env.DEFAULT_GUILD_ID || '';
 const DONATION_URL = process.env.DONATION_URL || '';
 const DONATION_ACCOUNT = process.env.DONATION_ACCOUNT || '';
+const DONATION_BANK_ACCOUNT = process.env.DONATION_BANK_ACCOUNT || 'IBK기업은행 08706196201017';
 const PUBLIC_BASE_URL = (process.env.PUBLIC_BASE_URL || `http://localhost:${PORT}`).replace(/\/$/, '');
 const DISCORD_CLIENT_ID = process.env.DISCORD_CLIENT_ID || '';
 const DISCORD_CLIENT_SECRET = process.env.DISCORD_CLIENT_SECRET || '';
+const DISCORD_BOT_TOKEN = process.env.DISCORD_BOT_TOKEN || process.env.TOKEN || '';
 const DISCORD_REDIRECT_URI = process.env.DISCORD_REDIRECT_URI || `${PUBLIC_BASE_URL}/auth/discord/callback`;
 const OWNER_USER_ID = process.env.OWNER_USER_ID || process.env.NATSUMI_OWNER_ID || '1293232804745838733';
 const calculateXP = (level) => level * level * 100;
 const escapeHtml = (value = '') => String(value).replace(/[&<>"']/g, (ch) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[ch]));
+async function sendOwnerSupportDm(row, tier) {
+  if (!DISCORD_BOT_TOKEN || !OWNER_USER_ID || !row || !tier) return false;
+  try {
+    const headers = { Authorization: `Bot ${DISCORD_BOT_TOKEN}`, 'Content-Type': 'application/json' };
+    const dmRes = await fetch('https://discord.com/api/v10/users/@me/channels', {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({ recipient_id: OWNER_USER_ID }),
+    });
+    if (!dmRes.ok) return false;
+    const channel = await dmRes.json();
+    const adminUrl = `${PUBLIC_BASE_URL}/support-admin?request=${encodeURIComponent(String(row._id))}`;
+    const lines = [
+      `후원 인증 요청이 들어왔어.`,
+      `신청자: ${row.username || row.userId || 'guest'}`,
+      `입금자명: ${row.name}`,
+      `금액: ${Number(row.amount || 0).toLocaleString('ko-KR')}원`,
+      `등급: ${tier.name}`,
+      row.memo ? `메모: ${row.memo}` : '',
+      `카카오페이 또는 IBK 입금 내역을 확인한 뒤 승인/반려해줘.`,
+    ].filter(Boolean).join('\n');
+    const msgRes = await fetch(`https://discord.com/api/v10/channels/${channel.id}/messages`, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({
+        content: lines,
+        components: [{
+          type: 1,
+          components: [
+            { type: 2, style: 5, label: '승인/반려 페이지 열기', url: adminUrl },
+            { type: 2, style: 5, label: '게임 사이트 열기', url: PUBLIC_BASE_URL },
+          ],
+        }],
+      }),
+    });
+    return msgRes.ok;
+  } catch (error) {
+    console.warn('[support dm] owner notification failed:', error.message);
+    return false;
+  }
+}
 
 app.use(express.json());
 app.use((req, res, next) => {
@@ -153,6 +196,7 @@ app.get('/api/config', (req, res) => res.json({
   donationEnabled: Boolean(DONATION_URL),
   donationUrl: DONATION_URL,
   donationAccount: DONATION_ACCOUNT,
+  donationBankAccount: DONATION_BANK_ACCOUNT,
   supportTiers,
   discordLoginEnabled: Boolean(DISCORD_CLIENT_ID && DISCORD_CLIENT_SECRET),
   publicBaseUrl: PUBLIC_BASE_URL,
@@ -182,6 +226,16 @@ app.get('/api/bag/me', async (req, res) => {
 });
 app.get('/api/balance/:userId', async (req, res) => { const data = await ensureMoney(req.params.userId); res.json({ userId: req.params.userId, money: toInt(data.money, 0) }); });
 app.get('/api/leaderboard', async (req, res) => { const rows = await Money.find().sort({ money: -1 }).limit(20).lean(); res.json({ users: rows.map((r, i) => ({ rank: i + 1, userId: r.userid, money: toInt(r.money, 0) })) }); });
+app.get('/support-admin', (req, res) => {
+  const requestId = escapeHtml(req.query.request || '');
+  res.type('html').send(`<!doctype html><html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><link rel="stylesheet" href="/style.css"><link rel="stylesheet" href="/game-enhance.css"><title>NATSUMI Support Admin</title></head><body><main class="layout"><section class="view active-view"><div class="section-head"><p class="eyebrow">SUPPORT ADMIN</p><h2>후원 확인</h2></div><p>운영자 디스코드 계정으로 로그인한 뒤 승인 또는 반려를 누르면 지급 처리돼.</p><div id="supportAdminList" class="pixel-list">불러오는 중...</div></section></main><script>
+const focusId=${JSON.stringify(requestId)};
+async function api(url,opt={}){const res=await fetch(url,{credentials:'include',headers:{'content-type':'application/json'},...opt});const data=await res.json().catch(()=>({}));if(!res.ok)throw new Error(data.error||'요청 실패');return data;}
+async function act(id,kind){await api('/api/support/requests/'+id+'/'+kind,{method:'POST',body:'{}'});await load();}
+async function load(){try{const data=await api('/api/support/requests');const rows=(data.requests||[]).filter(r=>!focusId||String(r._id)===focusId||r.status==='pending');document.querySelector('#supportAdminList').innerHTML=rows.map(r=>'<article class="support-card"><b>'+r.name+' · '+Number(r.amount||0).toLocaleString('ko-KR')+'원</b><p>'+r.tierName+' · '+r.status+' · '+(r.username||r.userId||'guest')+'</p><p>'+(r.memo||'메모 없음')+'</p><button onclick="act(\\''+r._id+'\\',\\'approve\\')">승인</button> <button onclick="act(\\''+r._id+'\\',\\'reject\\')">반려</button></article>').join('')||'대기 중인 요청이 없어.';}catch(e){document.querySelector('#supportAdminList').innerHTML='<p>'+e.message+'</p><a class="primary-link" href="/auth/discord">Discord 로그인</a>';}}
+load();
+</script></body></html>`);
+});
 app.post('/api/buy', async (req, res) => { const userId = currentUserId(req); const { itemType, key } = req.body; if (!userId || !['title', 'badge'].includes(itemType) || !key) return res.status(400).json({ error: '로그인 또는 userId, itemType, key가 필요해.' }); const Item = itemType === 'title' ? Title : Badge; const item = await Item.findOne({ key }).lean(); if (!item) return res.status(404).json({ error: '상점 아이템을 찾지 못했어.' }); const moneyData = await ensureMoney(userId); const currentMoney = toInt(moneyData.money, 0); if (currentMoney < item.price) return res.status(400).json({ error: `금전 부족! 필요 ${item.price}, 보유 ${currentMoney}` }); const field = itemType === 'title' ? 'titles' : 'badges'; const inv = await Inventory.findOne({ userId }); if (inv?.[field]?.includes(key)) return res.status(400).json({ error: '이미 가지고 있는 아이템이야.' }); await addMoney(userId, -item.price); await Inventory.updateOne({ userId }, { $addToSet: { [field]: key }, ...(itemType === 'title' ? { $setOnInsert: { activeTitle: key } } : {}) }, { upsert: true }); res.json({ ok: true, message: `${item.emoji} ${item.name} 구매 완료!` }); });
 app.post('/api/title/select', async (req, res) => { const userId = currentUserId(req); const { key } = req.body; const inv = await Inventory.findOne({ userId }); if (!inv?.titles?.includes(key)) return res.status(400).json({ error: '보유하지 않은 칭호야.' }); await Inventory.updateOne({ userId }, { $set: { activeTitle: key } }); res.json({ ok: true }); });
 app.post('/api/support/apply', async (req, res) => {
@@ -207,15 +261,18 @@ app.post('/api/support/apply', async (req, res) => {
     rewards,
   });
 
+  const ownerNotified = await sendOwnerSupportDm(row, tier);
   res.json({
     ok: true,
     id: row._id,
     status: 'pending',
     tier,
     rewards,
+    ownerNotified,
     message: `${tier.emoji} ${tier.name} 등급으로 접수했어. 실제 입금 확인 뒤 자동 지급돼. 확인 실패면 서포트로 안내할게.`,
     donationUrl: DONATION_URL,
     donationAccount: DONATION_ACCOUNT,
+    donationBankAccount: DONATION_BANK_ACCOUNT,
   });
 });
 app.get('/api/support/requests', async (req, res) => {

@@ -53,6 +53,7 @@ function getConfig() {
     defaultGuildId: config.DEFAULT_GUILD_ID || "",
     donationUrl: config.DONATION_URL || "",
     donationAccount: config.DONATION_ACCOUNT || "",
+    donationBankAccount: config.DONATION_BANK_ACCOUNT || "IBK기업은행 08706196201017",
     donationEnabled: Boolean(config.DONATION_URL),
     discordLoginEnabled: false,
     supportTiers: fallbackSupportTiers
@@ -69,6 +70,7 @@ async function loadServerConfig(baseConfig) {
       defaultGuildId: serverConfig.defaultGuildId || baseConfig.defaultGuildId,
       donationUrl: serverConfig.donationUrl || baseConfig.donationUrl,
       donationAccount: serverConfig.donationAccount || baseConfig.donationAccount,
+      donationBankAccount: serverConfig.donationBankAccount || baseConfig.donationBankAccount,
       donationEnabled: Boolean(serverConfig.donationEnabled || baseConfig.donationUrl),
       discordLoginEnabled: Boolean(serverConfig.discordLoginEnabled),
       publicBaseUrl: serverConfig.publicBaseUrl || "",
@@ -234,7 +236,7 @@ function renderGameStage(key, active = false) {
       <button class="reel" data-stop-reel="2" type="button">T</button>
     </div><div class="arcade-help">코인을 넣고 릴 3개를 직접 멈춰!</div></div>`;
   } else if (key === "fishing") {
-    stage.innerHTML = `<div class="fishing-scene"><div class="water"></div><div class="fish-lane"><span class="pixel-fish-swim"></span><span class="pixel-fish-swim fish-two"></span></div><button class="bobber" id="catchFishBtn" type="button">CAST</button><div class="fishing-progress"><span id="reelProgress"></span></div><div class="timing-bar"><span id="timingNeedle"></span><em></em></div><div class="arcade-help" id="fishingHelp">찌가 초록 구간에 들어오면 버튼을 눌러!</div></div>`;
+    stage.innerHTML = `<div class="fishing-scene"><div class="water"></div><div class="fish-lane"><span class="pixel-fish-swim"><i></i><b></b><em></em></span><span class="pixel-fish-swim fish-two"><i></i><b></b><em></em></span><span class="pixel-shell"></span><span class="pixel-bubbles"></span></div><button class="bobber" id="catchFishBtn" type="button">CAST</button><div class="fishing-progress"><span id="reelProgress"></span></div><div class="timing-bar"><span id="timingNeedle"></span><em></em></div><div class="arcade-help" id="fishingHelp">찌가 초록 구간에 들어오면 버튼을 눌러!</div></div>`;
   } else if (key === "mine") {
     stage.innerHTML = `<div class="mine-grid">${Array.from({ length: 9 }, (_, i) => `<button class="mine-cell" data-mine="${i}" type="button">${active ? "?" : "LOCK"}</button>`).join("")}</div><div class="arcade-help">입장 후 광산 타일 하나를 골라!</div>`;
   } else if (key === "mole") {
@@ -629,7 +631,7 @@ async function applySupportRequest() {
   result.textContent = "후원 인증 요청을 저장하는 중...";
   try {
     const data = await api("/api/support/apply", { method: "POST", body: JSON.stringify({ name, amount, memo }) });
-    result.innerHTML = `<b>${data.tier?.emoji || ""} ${data.tier?.name || "후원 접수"}</b><br>${data.message || "후원 인증 요청을 저장했어."}<br><small>가짜 후원으로 확인되면 실패 처리되고 서포트 안내가 표시돼.</small>`;
+    result.innerHTML = `<b>${data.tier?.emoji || ""} ${data.tier?.name || "후원 접수"}</b><br>${data.message || "후원 인증 요청을 저장했어."}<br><small>${data.ownerNotified ? "운영자 DM 알림 전송 완료" : "운영자 확인 대기"} · 가짜 후원은 실패 처리 후 서포트 안내가 표시돼.</small>`;
   } catch (error) {
     result.innerHTML = `<b>후원 확인 실패</b><br>${error.message}<br><small>입금했는데 실패로 보이면 서포트에서 관리자에게 문의해줘.</small>`;
   }
