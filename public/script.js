@@ -228,13 +228,13 @@ function renderGameStage(key, active = false) {
   if (!stage) return;
   stage.className = `game-stage pixel-stage stage-${key} ${active ? "is-playing" : ""}`;
   if (key === "slot") {
-    stage.innerHTML = `<div class="pixel-cabinet">${pixelIcon("slot")}<div class="reel-row">
+    stage.innerHTML = `<div class="pixel-cabinet slot-cabinet">${pixelIcon("slot")}<div class="reel-row">
       <button class="reel" data-stop-reel="0" type="button">N</button>
       <button class="reel" data-stop-reel="1" type="button">A</button>
       <button class="reel" data-stop-reel="2" type="button">T</button>
     </div><div class="arcade-help">코인을 넣고 릴 3개를 직접 멈춰!</div></div>`;
   } else if (key === "fishing") {
-    stage.innerHTML = `<div class="water"></div><div class="fish-shadow">FISH</div><button class="bobber" id="catchFishBtn" type="button">CAST</button><div class="timing-bar"><span id="timingNeedle"></span><em></em></div><div class="arcade-help">찌가 초록 구간에 들어오면 낚아 올려!</div>`;
+    stage.innerHTML = `<div class="fishing-scene"><div class="water"></div><div class="fish-lane"><span class="pixel-fish-swim"></span><span class="pixel-fish-swim fish-two"></span></div><button class="bobber" id="catchFishBtn" type="button">CAST</button><div class="fishing-progress"><span id="reelProgress"></span></div><div class="timing-bar"><span id="timingNeedle"></span><em></em></div><div class="arcade-help" id="fishingHelp">찌가 초록 구간에 들어오면 버튼을 눌러!</div></div>`;
   } else if (key === "mine") {
     stage.innerHTML = `<div class="mine-grid">${Array.from({ length: 9 }, (_, i) => `<button class="mine-cell" data-mine="${i}" type="button">${active ? "?" : "LOCK"}</button>`).join("")}</div><div class="arcade-help">입장 후 광산 타일 하나를 골라!</div>`;
   } else if (key === "mole") {
@@ -245,7 +245,6 @@ function renderGameStage(key, active = false) {
     stage.innerHTML = `<div class="bun-machine">${pixelIcon("bun")}<div class="bun-window">HOT</div><div class="bun-tray">${Array.from({ length: 4 }, (_, i) => `<button class="bun-pick" data-bun="${i}" type="button">BUN</button>`).join("")}</div><div class="arcade-help">진열대에서 붕어빵 하나를 골라!</div></div>`;
   }
 }
-
 function setPlaying(playing) {
   const button = $("#playGameBtn");
   if (!button) return;
@@ -493,9 +492,12 @@ function startBunGame() {
 }
 
 function startFishingGame() {
-  setHint("초록 구간에서 CATCH를 눌러.");
+  setHint("1차: 초록 구간에서 찌를 던져. 빨간 구간은 놓치거나 잡동사니가 나와.");
   const button = $("#catchFishBtn");
   const needle = $("#timingNeedle");
+  const progress = $("#reelProgress");
+  const help = $("#fishingHelp");
+  const stage = $("#gameStage");
   let pos = 0;
   let dir = 1;
   const timer = setInterval(() => {
@@ -507,11 +509,38 @@ function startFishingGame() {
   button.addEventListener("click", () => {
     clearInterval(timer);
     const sweet = pos > 42 && pos < 58;
-    button.textContent = sweet ? "PERFECT" : "PULL";
-    finishGame("/api/games/fishing", { timing: Math.round(pos), perfect: sweet });
+    if (!sweet) {
+      stage?.classList.add("fish-missed");
+      button.textContent = "MISS";
+      if (help) help.textContent = "빨간 구간! 찌를 놓쳤거나 이상한 게 걸렸어...";
+      finishGame("/api/games/fishing", { timing: Math.round(pos), perfect: false, struggleClicks: 0 });
+      return;
+    }
+    stage?.classList.add("fish-hooked");
+    setHint("2차: 물고기가 걸렸어. 제한 시간 안에 버튼을 연타해서 끌어올려!");
+    if (help) help.textContent = "물고기가 버틴다! REEL 버튼을 빠르게 눌러!";
+    button.textContent = "REEL 0/10";
+    let clicks = 0;
+    let finished = false;
+    const finishReel = (caught) => {
+      if (finished) return;
+      finished = true;
+      clearTimeout(limit);
+      button.disabled = true;
+      button.textContent = caught ? "CAUGHT" : "ESCAPED";
+      stage?.classList.toggle("fish-caught", caught);
+      finishGame("/api/games/fishing", { timing: Math.round(pos), perfect: caught, struggleClicks: clicks });
+    };
+    const limit = setTimeout(() => finishReel(false), 3200);
+    button.addEventListener("click", () => {
+      if (finished) return;
+      clicks += 1;
+      if (progress) progress.style.width = `${Math.min(100, clicks * 10)}%`;
+      button.textContent = `REEL ${clicks}/10`;
+      if (clicks >= 10) finishReel(true);
+    });
   }, { once: true });
 }
-
 function startGachaGame() {
   setHint("레버를 세 번 돌려 캡슐을 열어.");
   const lever = $("#gachaLever");

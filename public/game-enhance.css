@@ -84,3 +84,41 @@ body{background:#120719;color:var(--text);text-rendering:geometricPrecision}
 
 @media(max-width:900px){.game-choice{grid-template-columns:70px 1fr}.pixel-icon{width:64px;height:64px}.game-stage{min-height:300px}}
 @media(max-width:560px){.game-choice{min-height:116px}.game-choice b{font-size:16px}.game-choice small{font-size:13px}.game-stage{min-height:330px}.mole-cell{width:70px;height:70px}}
+
+/* Fishing mini-game and premium pixel icon tune-up */
+.game-play{background:linear-gradient(180deg,#271544,#12071f)!important}
+:root[data-theme="light"] .game-play{background:linear-gradient(180deg,#fffaf5,#ffe0ec)!important}
+.pixel-result{background:linear-gradient(180deg,#321451,#14071f)!important;color:#fff9d6!important}
+:root[data-theme="light"] .pixel-result{background:linear-gradient(180deg,#fffdf8,#ffe4ef)!important;color:#2a1220!important;border-color:#c23b75!important}
+:root[data-theme="light"] .pixel-result strong{color:#9c224f;text-shadow:none}
+.slot-cabinet{display:grid;justify-items:center;gap:16px}
+.stage-slot .pixel-icon.pixel-slot{position:relative;margin:0 0 4px;transform:none;z-index:2}
+.stage-slot .pixel-icon.pixel-slot b{right:-20px;top:27px;z-index:4}
+.stage-slot .pixel-icon.pixel-slot em{left:22px;right:auto;bottom:12px}
+.stage-slot .reel-row{position:relative;z-index:1;margin-top:0}
+.pixel-bun,.pixel-mine,.pixel-fish,.pixel-gacha,.pixel-mole{background:linear-gradient(180deg,#332447,#171021)!important;border:5px solid #17091f!important;border-radius:16px!important;box-shadow:inset 0 -12px 0 rgba(255,255,255,.06),10px 12px 0 rgba(0,0,0,.22)}
+.pixel-bun{background:linear-gradient(180deg,#ff9ac6 0 50%,#ffe66b 51% 62%,#35194b 63%)!important}
+.pixel-mine{background:linear-gradient(180deg,#46385d,#22172d)!important}
+.pixel-fish{background:linear-gradient(180deg,#6fd3ff 0 48%,#1b67d1 49%)!important}
+.pixel-gacha{background:linear-gradient(180deg,#ff7dba 0 48%,#ffe66b 49% 60%,#5c25b5 61%)!important}
+.pixel-mole{background:linear-gradient(180deg,#89c84e 0 56%,#315a18 57%)!important}
+:root[data-theme="light"] .pixel-bun,:root[data-theme="light"] .pixel-mine,:root[data-theme="light"] .pixel-fish,:root[data-theme="light"] .pixel-gacha,:root[data-theme="light"] .pixel-mole{box-shadow:inset 0 -12px 0 rgba(255,255,255,.2),10px 12px 0 rgba(102,54,70,.24)}
+.fishing-scene{position:relative;z-index:1;width:100%;min-height:300px;overflow:hidden;display:grid;place-items:center}
+.fish-lane{position:absolute;left:0;right:0;bottom:72px;height:86px;overflow:hidden;z-index:2}
+.pixel-fish-swim{position:absolute;left:-86px;bottom:10px;width:68px;height:34px;background:#ffd94d;border:5px solid #082f49;box-shadow:10px 10px 0 rgba(0,0,0,.18);animation:fishCruise 4.2s linear infinite}
+.pixel-fish-swim:before{content:"";position:absolute;right:-25px;top:4px;border-top:12px solid transparent;border-bottom:12px solid transparent;border-left:24px solid #ff6b9b}
+.pixel-fish-swim:after{content:"";position:absolute;left:13px;top:9px;width:7px;height:7px;background:#082f49;box-shadow:27px 10px #fff}
+.pixel-fish-swim.fish-two{bottom:44px;animation-duration:5.4s;animation-delay:1.2s;filter:hue-rotate(80deg) brightness(.95)}
+.bobber{z-index:5;min-width:86px;min-height:58px;border:5px solid #082f49!important;border-radius:0!important;background:linear-gradient(180deg,#fff 0 48%,#ef4444 49%)!important;color:#082f49!important;box-shadow:0 8px 0 rgba(0,0,0,.28);transition:transform .18s steps(2,end)}
+.fish-hooked .bobber{transform:translateX(-50%) translateY(72px);animation:bobberBite .28s steps(2,end) infinite}
+.fish-missed .bobber{transform:translateX(-50%) translateY(-20px) rotate(-8deg);filter:grayscale(.35)}
+.fish-caught .pixel-fish-swim{animation:fishCaught .65s steps(5,end) forwards}
+.fishing-progress{position:absolute;left:14%;right:14%;top:28px;height:18px;border:4px solid #082f49;background:#210d2b;z-index:4}
+.fishing-progress span{display:block;height:100%;width:0;background:linear-gradient(90deg,#22c55e,#facc15);transition:width .08s steps(2,end)}
+.stage-fishing .timing-bar{bottom:24px;z-index:4;border-radius:0;background:linear-gradient(90deg,#ef4444 0 40%,#22c55e 40% 60%,#ef4444 60%)}
+.stage-fishing .timing-bar span{background:#fff7c2;box-shadow:0 0 0 2px #111827}
+:root[data-theme="light"] .pixel-fish-swim{border-color:#06465f}
+:root[data-theme="light"] .fishing-progress{background:#fff1cc}
+@keyframes fishCruise{0%{left:-86px;transform:scaleX(1)}48%{left:102%;transform:scaleX(1)}49%{left:102%;transform:scaleX(-1)}98%{left:-86px;transform:scaleX(-1)}100%{left:-86px;transform:scaleX(1)}}
+@keyframes bobberBite{0%,100%{margin-top:0}50%{margin-top:12px}}
+@keyframes fishCaught{to{left:50%;bottom:150px;transform:translateX(-50%) rotate(-14deg) scale(1.25)}}
