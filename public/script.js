@@ -133,6 +133,18 @@ function displayNameFor(profile = state.profile) {
   return state.me?.globalName || state.me?.username || profile?.displayName || `NATSUMI-${String(profile?.userId || "0000").slice(-4)}`;
 }
 
+function avatarUrl() {
+  if (!state.me?.id) return "";
+  if (state.me.avatar) return `https://cdn.discordapp.com/avatars/${state.me.id}/${state.me.avatar}.png?size=128`;
+  let fallback = 0;
+  try {
+    fallback = Number(BigInt(state.me.id) >> 22n) % 6;
+  } catch {
+    fallback = 0;
+  }
+  return `https://cdn.discordapp.com/embed/avatars/${fallback}.png`;
+}
+
 function rankUrl(guildId, userId) {
   const name = encodeURIComponent(displayNameFor({ userId }));
   return state.config.apiBase ? `${state.config.apiBase}/rank-card/${guildId}/${userId}?name=${name}` : "#rankView";
@@ -165,13 +177,16 @@ function showPixelResult({ title, lines = [], tone = "normal" }) {
 }
 
 function itemCard(item, type) {
-  const iconType = type === "title" ? "slot" : "gacha";
+  const iconType = type === "title" ? "sword" : item.key?.includes("support") ? "heart" : "gem";
+  const owned = type === "title"
+    ? state.profile?.ownedTitles?.some((ownedItem) => ownedItem.key === item.key)
+    : state.profile?.ownedBadges?.some((ownedItem) => ownedItem.key === item.key);
   return `<article class="item pixel-shop-item">
     <div class="shop-vending-window">${pixelIcon(iconType)}<span class="emoji">${item.emoji}</span></div>
     <h3>${item.name}</h3>
     <small>${item.description}</small>
     <p><b>${fmt(item.price)}</b> 금전</p>
-    <button data-buy="${type}" data-key="${item.key}" type="button">구매하기</button>
+    <button data-buy="${type}" data-key="${item.key}" type="button" ${owned ? "disabled" : ""}>${owned ? "이미 보유중" : "구매하기"}</button>
   </article>`;
 }
 
@@ -256,6 +271,7 @@ function renderProfile() {
   const profile = state.profile;
   if (!profile) return;
   const active = profile.ownedTitles.find((item) => item.key === profile.activeTitle);
+  const avatar = avatarUrl();
   const titleOptions = profile.ownedTitles.length
     ? profile.ownedTitles.map((item) => `<button class="tab" data-title="${item.key}" type="button">${item.emoji} ${item.name}</button>`).join("")
     : "<p>보유 칭호 없음</p>";
@@ -263,6 +279,10 @@ function renderProfile() {
   $("#profileArea").className = "rank-card";
   $("#profileArea").innerHTML = `<div class="rank-glow"></div>
     <div class="pixel-rank-grid"></div>
+    <div class="discord-profile-chip">
+      ${avatar ? `<img src="${avatar}" alt="Discord 프로필" />` : ""}
+      <span>Discord Profile</span>
+    </div>
     <div><p class="eyebrow">${active ? `${active.emoji} ${active.name}` : "NATSUMI PLAYER"} ${state.demo ? " DEMO" : ""}</p>
       <h1>${displayNameFor(profile)}</h1><p>${badges}</p></div>
     <div class="level-badge">Lv.${profile.level}</div>
