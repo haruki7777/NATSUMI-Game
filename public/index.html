@@ -4,7 +4,7 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
   <meta name="theme-color" content="#120918" />
-  <title>NATSUMI Game Arcade</title>
+  <title>NATSUMI Game Center</title>
   <link rel="stylesheet" href="./style.css" />
   <link rel="stylesheet" href="./background.css" />
   <link rel="stylesheet" href="./game-enhance.css" />
@@ -14,21 +14,22 @@
   <div id="menuBackdrop" class="menu-backdrop"></div>
 
   <header class="topbar">
-    <a class="brand" href="#home" aria-label="NATSUMI Arcade 홈">
+    <a class="brand" href="#home" aria-label="NATSUMI Game Center">
       <span class="brand-mark">N</span>
-      <b>NATSUMI Arcade</b>
+      <b>NATSUMI Game Center</b>
     </a>
     <button id="menuToggle" class="hamburger" type="button" aria-label="메뉴 열기" aria-expanded="false">
       <span></span><span></span><span></span>
     </button>
     <aside id="drawerMenu" class="drawer-menu" aria-hidden="true">
       <div class="drawer-head">
-        <b>NATSUMI 메뉴</b>
+        <b>NATSUMI MENU</b>
         <button id="menuClose" class="ghost" type="button">닫기</button>
       </div>
       <nav class="nav-menu" aria-label="주요 메뉴">
         <button data-view="profile" class="nav-btn active" type="button">프로필</button>
-        <button data-view="games" class="nav-btn" type="button">게임</button>
+        <button data-view="games" class="nav-btn" type="button">게임센터</button>
+        <button data-view="inventory" class="nav-btn" type="button">가방/도감</button>
         <button data-view="shop" class="nav-btn" type="button">상점</button>
         <button data-view="support" class="nav-btn" type="button">후원</button>
         <button data-view="rank" class="nav-btn" type="button">랭크카드</button>
@@ -43,18 +44,18 @@
   </header>
 
   <main id="home" class="layout">
-    <section class="hero-card">
+    <section class="hero-card arcade-hero">
       <div class="hero-copy">
-        <p class="eyebrow">FOX GAME PORTAL</p>
+        <p class="eyebrow">PIXEL GAME CENTER</p>
         <h1>나츠미 게임센터</h1>
-        <p class="sub">Discord 계정으로 접속해서 금전, 랭크, 칭호, 배지, 미니게임을 한 화면에서 관리해요.</p>
+        <p class="sub">Discord 계정으로 접속해서 금전, 랭크, 칭호, 배지, 미니게임, 가방과 도감을 한 화면에서 즐겨요.</p>
         <div class="quick-form">
           <button id="loadBtn" type="button">내 프로필 불러오기</button>
         </div>
       </div>
-      <div class="mascot-card supporter-glow">
+      <div class="mascot-card supporter-glow arcade-sign">
         <div class="mascot">N</div>
-        <div class="speech">로그인하면 나츠미가 프로필과 게임 기록을 찾아올게요.</div>
+        <div class="speech">코인을 넣고 직접 조작하는 픽셀 아케이드!</div>
       </div>
     </section>
 
@@ -68,31 +69,40 @@
 
     <section id="gamesView" class="view">
       <div class="section-head">
-        <p class="eyebrow">GAMES</p>
-        <h2>게임 선택</h2>
+        <p class="eyebrow">ARCADE</p>
+        <h2>게임센터</h2>
       </div>
       <div class="game-console">
         <div class="game-list" id="gameList"></div>
         <div class="game-play">
+          <div class="game-marquee">
+            <span>INSERT COIN</span>
+            <span id="gameHint">게임을 고르고 코인을 넣어 주세요.</span>
+          </div>
           <div class="game-stage" id="gameStage">
             <div class="game-art" id="gameArt">777</div>
           </div>
-          <h3 id="gameTitle">슬롯머신</h3>
-          <p id="gameDesc">같은 그림을 맞춰 금전을 노려보세요.</p>
+          <h3 id="gameTitle">픽셀 슬롯</h3>
+          <p id="gameDesc">세 릴을 직접 멈춰 같은 문양을 맞춰 보세요.</p>
           <div class="bet-row">
             <input id="betInput" type="number" min="100" value="1000" inputmode="numeric" aria-label="베팅 금액" />
-            <button id="playGameBtn" type="button">게임 시작</button>
+            <button id="playGameBtn" type="button">코인 넣기</button>
           </div>
           <div id="gameResult" class="result-box hidden" aria-live="polite">게임 결과가 화면에 표시됩니다.</div>
-          <div class="arcade-inventory">
-            <div class="shop-tabs arcade-tabs">
-              <button class="tab active" data-arcade-tab="bag" type="button">가방</button>
-              <button class="tab" data-arcade-tab="collection" type="button">도감</button>
-            </div>
-            <div id="arcadeInventory" class="pixel-inventory">로그인 후 게임 기록을 불러올 수 있어요.</div>
-          </div>
         </div>
       </div>
+    </section>
+
+    <section id="inventoryView" class="view">
+      <div class="section-head">
+        <p class="eyebrow">BAG & COLLECTION</p>
+        <h2>가방과 도감</h2>
+      </div>
+      <div class="shop-tabs arcade-tabs">
+        <button class="tab active" data-arcade-tab="bag" type="button">가방</button>
+        <button class="tab" data-arcade-tab="collection" type="button">도감</button>
+      </div>
+      <div id="inventoryArea" class="pixel-inventory">로그인 후 게임 기록을 불러올 수 있어요.</div>
     </section>
 
     <section id="shopView" class="view">
@@ -110,19 +120,13 @@
     <section id="supportView" class="view">
       <div class="section-head">
         <p class="eyebrow">SUPPORTER</p>
-        <h2>후원자 전용 프로필</h2>
+        <h2>후원 자판기</h2>
       </div>
       <div class="support-grid">
         <article class="support-card supporter-glow">
-          <h3>후원 자판기</h3>
+          <h3>후원 등급 선택</h3>
           <p>금액을 고르면 등급이 자동 계산되고, 운영자 또는 봇 확인 후 칭호와 배지가 자동 지급돼요.</p>
           <div id="supportTierList" class="support-tier-list"></div>
-          <ul>
-            <li>5,000원 이상: 새싹 후원자</li>
-            <li>10,000원 이상: 하트 후원자</li>
-            <li>30,000원 이상: 별빛 후원자</li>
-            <li>50,000원 이상: 전설 후원자</li>
-          </ul>
         </article>
         <article class="support-card">
           <h3>후원 인증 안내</h3>

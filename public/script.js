@@ -8,7 +8,8 @@ let state = {
   me: null,
   game: "slot",
   bag: null,
-  mole: null
+  mole: null,
+  session: null
 };
 
 const $ = (query) => document.querySelector(query);
@@ -17,12 +18,12 @@ const storeKey = "natsumi-game-demo";
 const themeKey = "natsumi-game-theme";
 
 const gameDefs = {
-  slot: { name: "픽셀 슬롯", icon: "slot", desc: "세 칸을 맞춰 금전을 노리는 클래식 아케이드 게임.", api: "/api/games/slot" },
-  fishbun: { name: "붕어빵 뽑기", icon: "bun", desc: "따끈한 붕어빵 기계에서 달콤한 보상을 뽑아요.", api: "/api/games/fishbun" },
-  mine: { name: "비밀 광산", icon: "mine", desc: "칸을 열어 보석을 찾는 픽셀 광산 탐험.", api: "/api/games/mine" },
+  slot: { name: "픽셀 슬롯", icon: "slot", desc: "세 릴을 직접 멈춰 같은 문양을 노리는 아케이드 슬롯.", api: "/api/games/slot" },
+  fishbun: { name: "붕어빵 뽑기", icon: "bun", desc: "진열대에서 하나를 고르면 따끈한 보상이 나와요.", api: "/api/games/fishbun" },
+  mine: { name: "비밀 광산", icon: "mine", desc: "광산 타일 하나를 직접 골라 보석을 캐는 게임.", api: "/api/games/mine" },
   mole: { name: "두더지 속도전", icon: "mole", desc: "8초 동안 튀어나오는 두더지를 최대한 빠르게 잡아요.", api: "/api/games/mole" },
-  fishing: { name: "나츠미 낚시터", icon: "fish", desc: "물결을 기다렸다가 희귀 물고기와 보상을 낚아요.", api: "/api/games/fishing" },
-  anime: { name: "애니굿즈 가챠", icon: "gacha", desc: "봇의 애니굿즈 뽑기 감성을 웹 아케이드로 가져왔어요.", api: "/api/games/anime-gacha" }
+  fishing: { name: "나츠미 낚시터", icon: "fish", desc: "찌가 초록 구간에 들어왔을 때 낚아 올려요.", api: "/api/games/fishing" },
+  anime: { name: "애니굿즈 가챠", icon: "gacha", desc: "레버를 세 번 돌려 캡슐을 뽑는 웹 가챠.", api: "/api/games/anime-gacha" }
 };
 
 const fallbackSupportTiers = [
@@ -53,7 +54,8 @@ function getConfig() {
     donationUrl: config.DONATION_URL || "",
     donationAccount: config.DONATION_ACCOUNT || "",
     donationEnabled: Boolean(config.DONATION_URL),
-    discordLoginEnabled: false
+    discordLoginEnabled: false,
+    supportTiers: fallbackSupportTiers
   };
 }
 
@@ -91,12 +93,6 @@ function getInv(userId) {
   if (!all[userId]) all[userId] = { money: 300000, titles: ["rookie_fox"], badges: ["first_step"], activeTitle: "rookie_fox", anime: {}, fish: {} };
   writeAll(all);
   return all[userId];
-}
-
-function saveInv(userId, inv) {
-  const all = readAll();
-  all[userId] = inv;
-  writeAll(all);
 }
 
 async function api(url, options = {}) {
@@ -154,6 +150,7 @@ function showView(name) {
   document.querySelectorAll(".view").forEach((view) => view.classList.remove("active-view"));
   $(`#${name}View`)?.classList.add("active-view");
   document.querySelectorAll(".nav-btn").forEach((button) => button.classList.toggle("active", button.dataset.view === name));
+  if (name === "inventory") loadBag();
   window.scrollTo({ top: 0, behavior: "smooth" });
 }
 
@@ -172,8 +169,14 @@ function pixelIcon(type) {
 function showPixelResult({ title, lines = [], tone = "normal" }) {
   const stage = $("#gameStage");
   if (!stage) return;
+  stage.querySelector(".pixel-result")?.remove();
   const body = lines.map((line) => `<p>${line}</p>`).join("");
   stage.insertAdjacentHTML("beforeend", `<div class="pixel-result result-${tone}"><strong>${title}</strong>${body}</div>`);
+}
+
+function setHint(text) {
+  const hint = $("#gameHint");
+  if (hint) hint.textContent = text;
 }
 
 function itemCard(item, type) {
@@ -210,13 +213,14 @@ function renderGames() {
 
 function selectGame(key) {
   state.game = key;
+  state.session = null;
   const game = gameDefs[key];
   document.querySelectorAll("[data-game]").forEach((button) => button.classList.toggle("active", button.dataset.game === key));
   renderGameStage(key);
   $("#gameTitle").textContent = game.name;
   $("#gameDesc").textContent = game.desc;
   $("#betInput").style.display = ["fishing", "anime", "mole"].includes(key) ? "none" : "block";
-  $("#playGameBtn").textContent = key === "mole" ? "속도전 시작" : key === "anime" ? "1회 뽑기" : "게임 시작";
+  $("#playGameBtn").textContent = key === "slot" ? "코인 넣기" : key === "mole" ? "속도전 시작" : key === "anime" ? "가챠 시작" : "게임 입장";
 }
 
 function renderGameStage(key, active = false) {
@@ -225,18 +229,20 @@ function renderGameStage(key, active = false) {
   stage.className = `game-stage pixel-stage stage-${key} ${active ? "is-playing" : ""}`;
   if (key === "slot") {
     stage.innerHTML = `<div class="pixel-cabinet">${pixelIcon("slot")}<div class="reel-row">
-      <div class="reel ${active ? "spin" : ""}">N</div><div class="reel ${active ? "spin" : ""}">A</div><div class="reel ${active ? "spin" : ""}">T</div>
-    </div></div>`;
+      <button class="reel" data-stop-reel="0" type="button">N</button>
+      <button class="reel" data-stop-reel="1" type="button">A</button>
+      <button class="reel" data-stop-reel="2" type="button">T</button>
+    </div><div class="arcade-help">코인을 넣고 릴 3개를 직접 멈춰!</div></div>`;
   } else if (key === "fishing") {
-    stage.innerHTML = `<div class="water"></div><div class="fish-shadow">FISH</div><div class="bobber ${active ? "fish-caught" : ""}">HOOK</div><div class="pixel-ripple"></div>`;
+    stage.innerHTML = `<div class="water"></div><div class="fish-shadow">FISH</div><button class="bobber" id="catchFishBtn" type="button">CAST</button><div class="timing-bar"><span id="timingNeedle"></span><em></em></div><div class="arcade-help">찌가 초록 구간에 들어오면 낚아 올려!</div>`;
   } else if (key === "mine") {
-    stage.innerHTML = `<div class="mine-grid">${Array.from({ length: 9 }, (_, i) => `<button class="mine-cell" type="button">${active && i === 4 ? "GEM" : "?"}</button>`).join("")}</div>`;
+    stage.innerHTML = `<div class="mine-grid">${Array.from({ length: 9 }, (_, i) => `<button class="mine-cell" data-mine="${i}" type="button">${active ? "?" : "LOCK"}</button>`).join("")}</div><div class="arcade-help">입장 후 광산 타일 하나를 골라!</div>`;
   } else if (key === "mole") {
     stage.innerHTML = `<div class="mole-hud"><b id="moleTimer">8.0</b><span id="moleScore">0 HIT</span></div><div class="mole-grid">${Array.from({ length: 9 }, (_, i) => `<button class="mole-cell" data-mole="${i}" type="button"></button>`).join("")}</div>`;
   } else if (key === "anime") {
-    stage.innerHTML = `<div class="gacha-machine">${pixelIcon("gacha")}<div class="capsule ${active ? "capsule-roll" : ""}">CAPSULE</div><div class="pixel-lightbar"></div></div>`;
+    stage.innerHTML = `<div class="gacha-machine">${pixelIcon("gacha")}<div class="capsule">CAPSULE</div><button id="gachaLever" class="gacha-lever" type="button">LEVER 0/3</button><div class="pixel-lightbar"></div><div class="arcade-help">레버를 세 번 돌려 캡슐을 열어!</div></div>`;
   } else {
-    stage.innerHTML = `<div class="bun-machine">${pixelIcon("bun")}<div class="bun-window">${active ? "HOT" : "BUN"}</div></div>`;
+    stage.innerHTML = `<div class="bun-machine">${pixelIcon("bun")}<div class="bun-window">HOT</div><div class="bun-tray">${Array.from({ length: 4 }, (_, i) => `<button class="bun-pick" data-bun="${i}" type="button">BUN</button>`).join("")}</div><div class="arcade-help">진열대에서 붕어빵 하나를 골라!</div></div>`;
   }
 }
 
@@ -244,7 +250,8 @@ function setPlaying(playing) {
   const button = $("#playGameBtn");
   if (!button) return;
   button.disabled = playing;
-  button.textContent = playing ? "진행 중..." : state.game === "mole" ? "속도전 시작" : state.game === "anime" ? "1회 뽑기" : "게임 시작";
+  if (playing) button.textContent = "플레이 중";
+  else button.textContent = state.game === "slot" ? "코인 넣기" : state.game === "mole" ? "속도전 시작" : state.game === "anime" ? "가챠 시작" : "게임 입장";
 }
 
 function demoProfile(guildId, userId) {
@@ -347,7 +354,7 @@ async function loadBag() {
 }
 
 function renderBag() {
-  const area = $("#arcadeInventory");
+  const area = $("#inventoryArea");
   if (!area) return;
   if (!state.me) {
     area.textContent = "로그인 후 가방과 도감을 볼 수 있어요.";
@@ -357,10 +364,10 @@ function renderBag() {
   if (state.arcadeTab === "collection") {
     const anime = bag.collection?.anime || [];
     const fish = bag.collection?.fishing || [];
-    area.innerHTML = `<div class="pixel-list"><b>도감 수집률</b><p>애니굿즈 ${anime.length}종 · 낚시 ${fish.length}종</p>${[...anime, ...fish].slice(0, 18).map((name) => `<span>${name}</span>`).join("") || "<small>아직 수집 기록이 없어요.</small>"}</div>`;
+    area.innerHTML = `<div class="pixel-list"><b>도감 수집률</b><p>애니굿즈 ${anime.length}종 · 낚시 ${fish.length}종</p>${[...anime, ...fish].slice(0, 24).map((name) => `<span>${name}</span>`).join("") || "<small>아직 수집 기록이 없어요.</small>"}</div>`;
     return;
   }
-  const animeRows = (bag.anime || []).slice(0, 12).map((item) => `<span>${item.name} x${item.count}</span>`).join("");
+  const animeRows = (bag.anime || []).slice(0, 18).map((item) => `<span>${item.name} x${item.count}</span>`).join("");
   const fishRows = (bag.fishing || []).filter((item) => item.count > 0).map((item) => `<span>${item.name} x${item.count}</span>`).join("");
   area.innerHTML = `<div class="pixel-list"><b>가방</b>${animeRows || fishRows ? `${animeRows}${fishRows}` : "<small>아직 가방이 비어 있어요.</small>"}</div>`;
 }
@@ -384,6 +391,7 @@ function renderSupportTiers() {
 
 async function buyItem(event) {
   if (!requireLogin()) return;
+  if (event.currentTarget.disabled) return;
   const userId = currentUserId();
   const itemType = event.currentTarget.dataset.buy;
   const key = event.currentTarget.dataset.key;
@@ -411,22 +419,114 @@ async function playGame() {
   if (!requireLogin()) return;
   if (state.game === "mole") return startMoleGame();
   const key = state.game;
-  const game = gameDefs[key];
-  const bet = Number($("#betInput").value || 1000);
   setPlaying(true);
   renderGameStage(key, true);
+  if (key === "slot") return startSlotGame();
+  if (key === "mine") return startMineGame();
+  if (key === "fishbun") return startBunGame();
+  if (key === "fishing") return startFishingGame();
+  if (key === "anime") return startGachaGame();
+}
+
+async function finishGame(apiPath, body = {}) {
   try {
-    await new Promise((resolve) => setTimeout(resolve, 700));
-    const data = await api(game.api, { method: "POST", body: JSON.stringify({ bet, rollCount: key === "anime" ? 1 : undefined }) });
-    renderGameStage(key, false);
+    const data = await api(apiPath, { method: "POST", body: JSON.stringify(body) });
     showGameResult(data);
     await loadProfile();
   } catch (error) {
-    renderGameStage(key, false);
     showPixelResult({ title: "ERROR", lines: [error.message], tone: "bad" });
   } finally {
+    state.session = null;
     setPlaying(false);
   }
+}
+
+function startSlotGame() {
+  const bet = Number($("#betInput").value || 1000);
+  const symbols = ["N", "A", "T", "★", "7", "♥"];
+  const reels = [...document.querySelectorAll("[data-stop-reel]")];
+  let stopped = 0;
+  let finishing = false;
+  setHint("릴을 하나씩 눌러 멈춰줘.");
+  const timers = reels.map((reel) => setInterval(() => {
+    if (reel.dataset.stopped) return;
+    reel.textContent = symbols[Math.floor(Math.random() * symbols.length)];
+    reel.classList.add("spin");
+  }, 90));
+  reels.forEach((reel, index) => reel.addEventListener("click", () => {
+    if (reel.dataset.stopped || finishing) return;
+    reel.dataset.stopped = "1";
+    reel.classList.remove("spin");
+    clearInterval(timers[index]);
+    stopped += 1;
+    if (stopped === reels.length) {
+      finishing = true;
+      timers.forEach(clearInterval);
+      setHint("릴 정지 완료. 결과 정산 중...");
+      finishGame("/api/games/slot", { bet, stopped: reels.map((item) => item.textContent) });
+    }
+  }));
+}
+
+function startMineGame() {
+  const bet = Number($("#betInput").value || 1000);
+  setHint("광산 타일 하나를 골라.");
+  document.querySelectorAll("[data-mine]").forEach((cell) => cell.addEventListener("click", () => {
+    if (state.session === "done") return;
+    state.session = "done";
+    cell.textContent = "PICK";
+    cell.classList.add("picked");
+    finishGame("/api/games/mine", { bet, tile: cell.dataset.mine });
+  }));
+}
+
+function startBunGame() {
+  const bet = Number($("#betInput").value || 1000);
+  setHint("붕어빵 하나를 직접 골라.");
+  document.querySelectorAll("[data-bun]").forEach((bun) => bun.addEventListener("click", () => {
+    if (state.session === "done") return;
+    state.session = "done";
+    bun.textContent = "OPEN";
+    bun.classList.add("picked");
+    finishGame("/api/games/fishbun", { bet, bun: bun.dataset.bun });
+  }));
+}
+
+function startFishingGame() {
+  setHint("초록 구간에서 CATCH를 눌러.");
+  const button = $("#catchFishBtn");
+  const needle = $("#timingNeedle");
+  let pos = 0;
+  let dir = 1;
+  const timer = setInterval(() => {
+    pos += dir * 4;
+    if (pos >= 100 || pos <= 0) dir *= -1;
+    needle.style.left = `${pos}%`;
+  }, 35);
+  button.textContent = "CATCH";
+  button.addEventListener("click", () => {
+    clearInterval(timer);
+    const sweet = pos > 42 && pos < 58;
+    button.textContent = sweet ? "PERFECT" : "PULL";
+    finishGame("/api/games/fishing", { timing: Math.round(pos), perfect: sweet });
+  }, { once: true });
+}
+
+function startGachaGame() {
+  setHint("레버를 세 번 돌려 캡슐을 열어.");
+  const lever = $("#gachaLever");
+  const capsule = document.querySelector(".capsule");
+  let pulls = 0;
+  lever.addEventListener("click", () => {
+    pulls += 1;
+    lever.textContent = `LEVER ${pulls}/3`;
+    capsule.classList.add("capsule-roll");
+    setTimeout(() => capsule.classList.remove("capsule-roll"), 260);
+    if (pulls >= 3) {
+      lever.disabled = true;
+      finishGame("/api/games/anime-gacha", { rollCount: 1 });
+    }
+  });
 }
 
 function showGameResult(data) {
@@ -452,7 +552,10 @@ function startMoleGame() {
   let active = -1;
   state.mole = { running: true };
   const setActive = () => {
-    cells.forEach((cell) => cell.classList.remove("active"));
+    cells.forEach((cell) => {
+      cell.classList.remove("active");
+      cell.textContent = "";
+    });
     active = Math.floor(Math.random() * cells.length);
     cells[active].classList.add("active");
     cells[active].textContent = "HIT";
@@ -476,15 +579,7 @@ function startMoleGame() {
     clearInterval(clock);
     cells.forEach((cell) => cell.removeEventListener("click", hit));
     state.mole = null;
-    try {
-      const data = await api("/api/games/mole", { method: "POST", body: JSON.stringify({ score, difficulty: "medium" }) });
-      showGameResult(data);
-      await loadProfile();
-    } catch (error) {
-      showPixelResult({ title: "MOLE FAIL", lines: [error.message], tone: "bad" });
-    } finally {
-      setPlaying(false);
-    }
+    await finishGame("/api/games/mole", { score, difficulty: "medium" });
   }, 8000);
 }
 
@@ -586,7 +681,7 @@ async function init() {
     await loadProfile();
   } else {
     $("#profileArea").className = "empty";
-    $("#profileArea").textContent = "Discord 로그인 후 내 레벨, 경험치, 금전, 랭크카드를 불러올 수 있어요.";
+    $("#profileArea").textContent = "Discord 로그인 후 레벨, 경험치, 금전, 랭크카드를 불러올 수 있어요.";
     renderBag();
   }
 }
