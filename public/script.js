@@ -238,7 +238,7 @@ function renderGameStage(key, active = false) {
   } else if (key === "mine") {
     stage.innerHTML = `<div class="mine-grid">${Array.from({ length: 9 }, (_, i) => `<button class="mine-cell" data-mine="${i}" type="button">${active ? "?" : "LOCK"}</button>`).join("")}</div><div class="arcade-help">입장 후 광산 타일 하나를 골라!</div>`;
   } else if (key === "mole") {
-    stage.innerHTML = `<div class="mole-hud"><b id="moleTimer">8.0</b><span id="moleScore">0 HIT</span></div><div class="mole-grid">${Array.from({ length: 9 }, (_, i) => `<button class="mole-cell" data-mole="${i}" type="button"></button>`).join("")}</div>`;
+    stage.innerHTML = `<div class="mole-hud"><b id="moleTimer">8.0</b><span id="moleScore">0 HIT</span></div><div class="mole-grid">${Array.from({ length: 9 }, (_, i) => `<button class="mole-cell" data-mole="${i}" type="button"><span class="mole-dirt"></span><span class="mole-sprite"></span><span class="hit-pop">HIT!</span></button>`).join("")}</div><div class="arcade-help">두더지가 올라오는 구멍을 바로 눌러!</div>`;
   } else if (key === "anime") {
     stage.innerHTML = `<div class="gacha-machine">${pixelIcon("gacha")}<div class="capsule">CAPSULE</div><button id="gachaLever" class="gacha-lever" type="button">LEVER 0/3</button><div class="pixel-lightbar"></div><div class="arcade-help">레버를 세 번 돌려 캡슐을 열어!</div></div>`;
   } else {
@@ -553,19 +553,19 @@ function startMoleGame() {
   state.mole = { running: true };
   const setActive = () => {
     cells.forEach((cell) => {
-      cell.classList.remove("active");
-      cell.textContent = "";
+      cell.classList.remove("active", "bonked");
     });
     active = Math.floor(Math.random() * cells.length);
     cells[active].classList.add("active");
-    cells[active].textContent = "HIT";
   };
   const hit = (event) => {
     const idx = Number(event.currentTarget.dataset.mole);
     if (idx !== active) return;
     score += 1;
     $("#moleScore").textContent = `${score} HIT`;
-    setActive();
+    event.currentTarget.classList.add("bonked");
+    event.currentTarget.classList.remove("active");
+    setTimeout(setActive, 120);
   };
   cells.forEach((cell) => cell.addEventListener("click", hit));
   setActive();
