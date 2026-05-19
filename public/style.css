@@ -17,20 +17,20 @@
 }
 
 :root[data-theme="light"] {
-  --bg: #fff8f5;
-  --panel: rgba(255, 252, 250, .84);
-  --panel-strong: rgba(255, 247, 242, .94);
+  --bg: #fff3f8;
+  --panel: rgba(255, 252, 254, .9);
+  --panel-strong: rgba(255, 245, 251, .96);
   --text: #2a1720;
-  --muted: #674d5a;
-  --accent: #ff7a1a;
-  --pink: #f23f94;
+  --muted: #73435a;
+  --accent: #ff8f4d;
+  --pink: #f23891;
   --cyan: #1594b7;
   --line: rgba(94, 47, 71, .18);
   --shadow: 0 24px 70px rgba(86, 42, 66, .18);
   --topbar-bg: rgba(255, 249, 246, .76);
   --input-bg: rgba(255, 255, 255, .82);
   --soft-card: rgba(255, 255, 255, .42);
-  --hero-overlay: linear-gradient(90deg, rgba(255, 248, 245, .82), rgba(255, 235, 228, .45), rgba(255, 210, 226, .16));
+  --hero-overlay: linear-gradient(90deg, rgba(255, 247, 252, .86), rgba(255, 222, 239, .52), rgba(255, 196, 222, .2));
 }
 
 * { box-sizing: border-box; }
@@ -120,6 +120,31 @@ a { color: inherit; text-decoration: none; }
 .login-box { display: grid; gap: 10px; color: var(--muted); }
 .hidden { display: none !important; }
 .theme-toggle { border-color: rgba(255, 138, 42, .42); }
+.policy-footer {
+  position: fixed;
+  left: 18px;
+  bottom: 18px;
+  z-index: 30;
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  max-width: calc(100vw - 150px);
+}
+.policy-footer a {
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--panel-strong);
+  color: var(--text);
+  padding: 9px 12px;
+  font-size: 13px;
+  font-weight: 900;
+  box-shadow: var(--shadow);
+}
+.policy-view {
+  display: block;
+  max-width: 900px;
+  margin: 40px auto;
+}
 
 .layout {
   width: min(1220px, 100%);

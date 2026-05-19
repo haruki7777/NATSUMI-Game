@@ -20,6 +20,12 @@ const DISCORD_CLIENT_SECRET = process.env.DISCORD_CLIENT_SECRET || '';
 const DISCORD_BOT_TOKEN = process.env.DISCORD_BOT_TOKEN || process.env.TOKEN || '';
 const DISCORD_REDIRECT_URI = process.env.DISCORD_REDIRECT_URI || `${PUBLIC_BASE_URL}/auth/discord/callback`;
 const OWNER_USER_ID = process.env.OWNER_USER_ID || process.env.NATSUMI_OWNER_ID || '1293232804745838733';
+const DASHBOARD_URL = process.env.DASHBOARD_URL || 'https://haruki7777.github.io/natsumi-dashboard/';
+const SITE_URL = process.env.SITE_URL || PUBLIC_BASE_URL;
+const KOREANBOTS_TOKEN = process.env.KOREANBOTS_TOKEN || '';
+const KOREANBOTS_BOT_ID = process.env.KOREANBOTS_BOT_ID || '';
+const DISCORD_ADMINISTRATOR = 0x8n;
+const DISCORD_MANAGE_GUILD = 0x20n;
 const calculateXP = (level) => level * level * 100;
 const escapeHtml = (value = '') => String(value).replace(/[&<>"']/g, (ch) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[ch]));
 async function sendOwnerSupportDm(row, tier) {
@@ -66,8 +72,15 @@ async function sendOwnerSupportDm(row, tier) {
 
 app.use(express.json());
 app.use((req, res, next) => {
-  res.setHeader('Access-Control-Allow-Origin', process.env.ALLOWED_ORIGIN || '*');
-  res.setHeader('Access-Control-Allow-Methods', 'GET,POST,OPTIONS');
+  const allowed = (process.env.ALLOWED_ORIGINS || process.env.ALLOWED_ORIGIN || `${DASHBOARD_URL},${SITE_URL}`)
+    .split(',')
+    .map((origin) => origin.trim().replace(/\/$/, ''))
+    .filter(Boolean);
+  const origin = req.headers.origin?.replace(/\/$/, '');
+  res.setHeader('Access-Control-Allow-Origin', origin && allowed.includes(origin) ? req.headers.origin : (allowed[0] || '*'));
+  res.setHeader('Vary', 'Origin');
+  res.setHeader('Access-Control-Allow-Credentials', 'true');
+  res.setHeader('Access-Control-Allow-Methods', 'GET,POST,PATCH,OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
   if (req.method === 'OPTIONS') return res.sendStatus(204);
   next();
@@ -76,7 +89,7 @@ app.use(session({
   secret: process.env.SESSION_SECRET || 'change-this-natsumi-secret',
   resave: false,
   saveUninitialized: false,
-  cookie: { maxAge: 1000 * 60 * 60 * 24 * 14, sameSite: 'lax', secure: PUBLIC_BASE_URL.startsWith('https://') }
+  cookie: { maxAge: 1000 * 60 * 60 * 24 * 14, sameSite: PUBLIC_BASE_URL.startsWith('https://') ? 'none' : 'lax', secure: PUBLIC_BASE_URL.startsWith('https://') }
 }));
 app.use(express.static(path.join(__dirname, 'public')));
 
@@ -99,6 +112,50 @@ const SupportRequest = model('GameSupportRequest', new Schema({
   status: { type: String, default: 'pending', index: true },
   createdAt: { type: Date, default: Date.now },
   processedAt: Date,
+}));
+const DashboardSettings = model('DashboardSettings', new Schema({
+  guildId: { type: String, required: true, unique: true, index: true },
+  disabledCommands: { type: [String], default: [] },
+  features: {
+    welcome: { type: Boolean, default: false },
+    notice: { type: Boolean, default: true },
+    ticket: { type: Boolean, default: true },
+    tts: { type: Boolean, default: false },
+    ai: { type: Boolean, default: true },
+    shop: { type: Boolean, default: true },
+    emojiUpscale: { type: Boolean, default: false },
+  },
+  welcome: {
+    enabled: { type: Boolean, default: false },
+    channelId: String,
+    leaveChannelId: String,
+    cleanupOnLeave: { type: Boolean, default: true },
+    message: String,
+    aiPrompt: String,
+    templates: { type: [Schema.Types.Mixed], default: [] },
+  },
+  notice: { enabled: { type: Boolean, default: true }, channelId: String, message: String },
+  tts: { enabled: { type: Boolean, default: false }, categoryId: String, textChannelId: String, voiceChannelId: String, voice: String },
+  emojiUpscale: { enabled: { type: Boolean, default: false }, channelId: String, webhookName: String },
+}, { timestamps: true }));
+const DashboardNotice = model('DashboardNotice', new Schema({
+  guildId: String,
+  authorId: String,
+  authorName: String,
+  message: String,
+  status: { type: String, default: 'draft', index: true },
+  createdAt: { type: Date, default: Date.now },
+}));
+const DashboardQuestion = model('DashboardQuestion', new Schema({
+  guildId: String,
+  userId: String,
+  username: String,
+  question: String,
+  answer: String,
+  answeredBy: String,
+  status: { type: String, default: 'open', index: true },
+  createdAt: { type: Date, default: Date.now },
+  answeredAt: Date,
 }));
 const AnimeInventory = model('AnimeInventory', new Schema({
   userId: { type: String, required: true, unique: true },
@@ -153,6 +210,67 @@ async function grantSupportRewards(userId, tier) {
 function rollAnimeGood() { const chance = Math.random() * 100; const category = animeRates.find(([, limit]) => chance < limit)?.[0] || 'FAIL'; return { category, name: pick(animeGoods[category]) }; }
 async function saveAnimeGoods(userId, results) { let inv = await AnimeInventory.findOne({ userId }); if (!inv) inv = new AnimeInventory({ userId, items: {} }); for (const item of results) { if (item.category === 'FAIL') continue; inv.items.set(item.name, (inv.items.get(item.name) || 0) + 1); } await inv.save(); const names = results.filter((item) => item.category !== 'FAIL').map((item) => item.name); if (names.length) await Collection.updateOne({ userId }, { $addToSet: { animeItems: { $each: names } } }, { upsert: true }); return inv; }
 async function saveFishingCollection(userId, item) { if (item) await Collection.updateOne({ userId }, { $addToSet: { fishingItems: item } }, { upsert: true }); }
+function requireLogin(req, res, next) {
+  if (req.session?.discordUser?.id) return next();
+  return res.status(401).json({ error: 'Discord login required.' });
+}
+function isOwner(req) {
+  return Boolean(OWNER_USER_ID && req.session?.discordUser?.id === OWNER_USER_ID);
+}
+function isGuildAdmin(row) {
+  try {
+    const permissions = BigInt(row.permissions || 0);
+    return (permissions & DISCORD_ADMINISTRATOR) === DISCORD_ADMINISTRATOR
+      || (permissions & DISCORD_MANAGE_GUILD) === DISCORD_MANAGE_GUILD;
+  } catch {
+    return false;
+  }
+}
+async function fetchUserGuilds(req) {
+  const token = req.session?.discordAccessToken;
+  if (!token) return [];
+  const res = await fetch('https://discord.com/api/v10/users/@me/guilds', {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  if (!res.ok) return [];
+  return res.json();
+}
+async function userCanManageGuild(req, guildId) {
+  if (isOwner(req)) return true;
+  const guilds = await fetchUserGuilds(req);
+  return guilds.some((guild) => guild.id === guildId && isGuildAdmin(guild));
+}
+async function requireGuildAdmin(req, res, next) {
+  if (await userCanManageGuild(req, req.params.guildId)) return next();
+  return res.status(403).json({ error: 'Only server administrators can change this setting.' });
+}
+async function fetchBotGuildChannels(guildId) {
+  if (!DISCORD_BOT_TOKEN) return [];
+  const res = await fetch(`https://discord.com/api/v10/guilds/${guildId}/channels`, {
+    headers: { Authorization: `Bot ${DISCORD_BOT_TOKEN}` },
+  });
+  if (!res.ok) return [];
+  const channels = await res.json();
+  return channels.map((channel) => ({
+    id: channel.id,
+    name: channel.name,
+    parentId: channel.parent_id || null,
+    type: channel.type === 0 ? 'text' : channel.type === 2 ? 'voice' : channel.type === 4 ? 'category' : 'other',
+  })).filter((channel) => channel.type !== 'other');
+}
+async function fetchKoreanbotsServers() {
+  if (!KOREANBOTS_BOT_ID) return null;
+  try {
+    const res = await fetch(`https://koreanbots.dev/api/v2/bots/${KOREANBOTS_BOT_ID}`, {
+      headers: KOREANBOTS_TOKEN ? { Authorization: KOREANBOTS_TOKEN } : {},
+    });
+    if (!res.ok) return null;
+    const data = await res.json();
+    return data?.data?.servers ?? data?.servers ?? null;
+  } catch {
+    return null;
+  }
+}
 async function getProfile(guildId, userId) {
   const levelQuery = guildId && guildId !== 'demo-guild'
     ? { GuildID: guildId, UserID: userId }
@@ -186,8 +304,8 @@ async function getProfile(guildId, userId) {
   };
 }
 
-app.get('/auth/discord', (req, res) => { if (!DISCORD_CLIENT_ID) return res.status(500).send('DISCORD_CLIENT_ID가 필요해.'); const state = Math.random().toString(36).slice(2); req.session.oauthState = state; const params = new URLSearchParams({ client_id: DISCORD_CLIENT_ID, redirect_uri: DISCORD_REDIRECT_URI, response_type: 'code', scope: 'identify', state }); res.redirect(`https://discord.com/api/oauth2/authorize?${params.toString()}`); });
-app.get('/auth/discord/callback', async (req, res) => { try { if (!req.query.code || req.query.state !== req.session.oauthState) return res.status(400).send('OAuth state가 맞지 않아.'); const tokenRes = await fetch('https://discord.com/api/oauth2/token', { method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, body: new URLSearchParams({ client_id: DISCORD_CLIENT_ID, client_secret: DISCORD_CLIENT_SECRET, grant_type: 'authorization_code', code: String(req.query.code), redirect_uri: DISCORD_REDIRECT_URI }) }); const token = await tokenRes.json(); if (!token.access_token) return res.status(400).json(token); const userRes = await fetch('https://discord.com/api/users/@me', { headers: { Authorization: `Bearer ${token.access_token}` } }); const user = await userRes.json(); req.session.discordUser = { id: user.id, username: user.username, globalName: user.global_name, avatar: user.avatar }; res.redirect('/'); } catch (err) { console.error(err); res.status(500).send('Discord 로그인 실패'); } });
+app.get('/auth/discord', (req, res) => { if (!DISCORD_CLIENT_ID) return res.status(500).send('DISCORD_CLIENT_ID가 필요해.'); const state = Math.random().toString(36).slice(2); req.session.oauthState = state; req.session.oauthReturnTo = typeof req.query.returnTo === 'string' ? req.query.returnTo : '/'; const params = new URLSearchParams({ client_id: DISCORD_CLIENT_ID, redirect_uri: DISCORD_REDIRECT_URI, response_type: 'code', scope: 'identify guilds', state }); res.redirect(`https://discord.com/api/oauth2/authorize?${params.toString()}`); });
+app.get('/auth/discord/callback', async (req, res) => { try { if (!req.query.code || req.query.state !== req.session.oauthState) return res.status(400).send('OAuth state가 맞지 않아.'); const tokenRes = await fetch('https://discord.com/api/oauth2/token', { method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, body: new URLSearchParams({ client_id: DISCORD_CLIENT_ID, client_secret: DISCORD_CLIENT_SECRET, grant_type: 'authorization_code', code: String(req.query.code), redirect_uri: DISCORD_REDIRECT_URI }) }); const token = await tokenRes.json(); if (!token.access_token) return res.status(400).json(token); const userRes = await fetch('https://discord.com/api/users/@me', { headers: { Authorization: `Bearer ${token.access_token}` } }); const user = await userRes.json(); req.session.discordAccessToken = token.access_token; req.session.discordUser = { id: user.id, username: user.username, globalName: user.global_name, avatar: user.avatar }; const returnTo = req.session.oauthReturnTo || '/'; delete req.session.oauthReturnTo; res.redirect(returnTo); } catch (err) { console.error(err); res.status(500).send('Discord 로그인 실패'); } });
 app.post('/auth/logout', (req, res) => req.session.destroy(() => res.json({ ok: true })));
 app.get('/api/me', (req, res) => res.json({ user: req.session?.discordUser || null }));
 app.get('/api/config', (req, res) => res.json({
@@ -201,7 +319,87 @@ app.get('/api/config', (req, res) => res.json({
   discordLoginEnabled: Boolean(DISCORD_CLIENT_ID && DISCORD_CLIENT_SECRET),
   publicBaseUrl: PUBLIC_BASE_URL,
   discordRedirectUri: DISCORD_REDIRECT_URI,
+  dashboardUrl: DASHBOARD_URL,
+  gameCenterUrl: SITE_URL,
 }));
+app.get('/api/stats', async (req, res) => {
+  const [koreanbotsServers, botGuilds] = await Promise.all([
+    fetchKoreanbotsServers(),
+    DISCORD_BOT_TOKEN ? fetch('https://discord.com/api/v10/users/@me/guilds', { headers: { Authorization: `Bot ${DISCORD_BOT_TOKEN}` } }).then((r) => r.ok ? r.json() : []).catch(() => []) : [],
+  ]);
+  res.json({
+    botServers: Array.isArray(botGuilds) ? botGuilds.length : null,
+    koreanbotsServers,
+  });
+});
+app.get('/api/dashboard/session', (req, res) => res.json({ user: req.session?.discordUser || null, isOwner: isOwner(req) }));
+app.get('/api/dashboard/guilds', requireLogin, async (req, res) => {
+  const userGuilds = await fetchUserGuilds(req);
+  const manageable = userGuilds.filter(isGuildAdmin);
+  const guilds = await Promise.all(manageable.map(async (guild) => ({
+    id: guild.id,
+    name: guild.name,
+    icon: guild.icon ? `https://cdn.discordapp.com/icons/${guild.id}/${guild.icon}.png?size=128` : '',
+    manageable: true,
+    channels: await fetchBotGuildChannels(guild.id),
+  })));
+  res.json({ guilds });
+});
+app.get('/api/dashboard/guilds/:guildId/settings', requireLogin, requireGuildAdmin, async (req, res) => {
+  const settings = await DashboardSettings.findOneAndUpdate(
+    { guildId: req.params.guildId },
+    { $setOnInsert: { guildId: req.params.guildId } },
+    { upsert: true, new: true }
+  ).lean();
+  res.json({ settings });
+});
+app.patch('/api/dashboard/guilds/:guildId/settings', requireLogin, requireGuildAdmin, async (req, res) => {
+  const next = req.body?.settings || {};
+  const settings = await DashboardSettings.findOneAndUpdate(
+    { guildId: req.params.guildId },
+    { $set: { ...next, guildId: req.params.guildId } },
+    { upsert: true, new: true }
+  ).lean();
+  res.json({ ok: true, settings });
+});
+app.post('/api/dashboard/guilds/:guildId/notice', requireLogin, requireGuildAdmin, async (req, res) => {
+  const message = String(req.body?.notice?.message || '').trim().slice(0, 1800);
+  if (!message) return res.status(400).json({ error: '공지 내용이 비어 있어.' });
+  const row = await DashboardNotice.create({
+    guildId: req.params.guildId,
+    authorId: req.session.discordUser.id,
+    authorName: req.session.discordUser.globalName || req.session.discordUser.username,
+    message,
+    status: isOwner(req) ? 'approved' : 'pending',
+  });
+  res.json({ ok: true, notice: row, needsDeveloperReview: row.status === 'pending' });
+});
+app.get('/api/dashboard/guilds/:guildId/questions', requireLogin, requireGuildAdmin, async (req, res) => {
+  const rows = await DashboardQuestion.find({ guildId: req.params.guildId }).sort({ createdAt: -1 }).limit(50).lean();
+  res.json({ questions: rows });
+});
+app.post('/api/dashboard/guilds/:guildId/questions', requireLogin, async (req, res) => {
+  const question = String(req.body?.question || '').trim().slice(0, 1000);
+  if (!question) return res.status(400).json({ error: '질문 내용이 비어 있어.' });
+  const row = await DashboardQuestion.create({
+    guildId: req.params.guildId,
+    userId: req.session.discordUser.id,
+    username: req.session.discordUser.globalName || req.session.discordUser.username,
+    question,
+  });
+  res.json({ ok: true, question: row });
+});
+app.post('/api/dashboard/guilds/:guildId/questions/:id/answer', requireLogin, async (req, res) => {
+  if (!isOwner(req)) return res.status(403).json({ error: '개발자만 답변할 수 있어.' });
+  const answer = String(req.body?.answer || '').trim().slice(0, 1800);
+  if (!answer) return res.status(400).json({ error: '답변 내용이 비어 있어.' });
+  const row = await DashboardQuestion.findOneAndUpdate(
+    { _id: req.params.id, guildId: req.params.guildId },
+    { $set: { answer, answeredBy: req.session.discordUser.id, answeredAt: new Date(), status: 'answered' } },
+    { new: true }
+  ).lean();
+  res.json({ ok: true, question: row });
+});
 app.get('/api/shop', async (req, res) => { const [titles, badges] = await Promise.all([Title.find().sort({ price: 1 }).lean(), Badge.find().sort({ price: 1 }).lean()]); res.json({ titles, badges }); });
 app.get('/api/profile/me', async (req, res) => { if (!req.session?.discordUser?.id) return res.status(401).json({ error: 'Discord 로그인이 필요해.' }); res.json(await getProfile(DEFAULT_GUILD_ID, req.session.discordUser.id)); });
 app.get('/api/profile/:guildId/:userId', async (req, res) => res.json(await getProfile(req.params.guildId, req.params.userId)));
@@ -235,6 +433,16 @@ async function act(id,kind){await api('/api/support/requests/'+id+'/'+kind,{meth
 async function load(){try{const data=await api('/api/support/requests');const rows=(data.requests||[]).filter(r=>!focusId||String(r._id)===focusId||r.status==='pending');document.querySelector('#supportAdminList').innerHTML=rows.map(r=>'<article class="support-card"><b>'+r.name+' · '+Number(r.amount||0).toLocaleString('ko-KR')+'원</b><p>'+r.tierName+' · '+r.status+' · '+(r.username||r.userId||'guest')+'</p><p>'+(r.memo||'메모 없음')+'</p><button onclick="act(\\''+r._id+'\\',\\'approve\\')">승인</button> <button onclick="act(\\''+r._id+'\\',\\'reject\\')">반려</button></article>').join('')||'대기 중인 요청이 없어.';}catch(e){document.querySelector('#supportAdminList').innerHTML='<p>'+e.message+'</p><a class="primary-link" href="/auth/discord">Discord 로그인</a>';}}
 load();
 </script></body></html>`);
+});
+app.get(['/terms', '/privacy', '/refund', '/data-policy'], (req, res) => {
+  const pages = {
+    '/terms': ['이용약관', ['나츠미 게임센터와 대시보드는 Discord 계정 기반 서버 관리와 게임 기능을 제공합니다.', '서비스 악용, 허위 후원 인증, 타인 정보 도용은 이용 제한 대상입니다.']],
+    '/privacy': ['개인정보 처리방침', ['Discord 로그인 시 사용자 ID, 이름, 아바타, 관리 가능한 서버 목록 확인 권한을 사용합니다.', '서버 설정, 랭크, 금전, 상점, 질문답변, 후원 요청 데이터는 기능 제공과 운영 확인을 위해 저장됩니다.']],
+    '/refund': ['환불정책', ['후원은 선입금 후 운영자 확인 방식입니다.', '선입금되어 보상 지급 절차가 시작되었거나 지급된 결과는 환불할 수 없습니다.', '허위 인증 또는 금액 불일치는 실패 처리되며 관리자 문의가 필요합니다.']],
+    '/data-policy': ['데이터정책', ['랭크, 경험치, 금전, 칭호, 배지, 서버 설정은 MongoDB에 저장됩니다.', '불필요한 데이터는 운영자 확인 후 정리할 수 있으며 장애 복구를 위한 백업이 존재할 수 있습니다.']],
+  };
+  const [title, body] = pages[req.path] || pages['/terms'];
+  res.type('html').send(`<!doctype html><html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><link rel="stylesheet" href="/style.css"><link rel="stylesheet" href="/game-enhance.css"><title>NATSUMI ${escapeHtml(title)}</title></head><body><main class="layout"><section class="view active-view policy-view"><p class="eyebrow">NATSUMI POLICY</p><h1>${escapeHtml(title)}</h1>${body.map((line) => `<p>${escapeHtml(line)}</p>`).join('')}<p><a class="primary-link" href="/">게임센터로 돌아가기</a> <a class="primary-link" href="${DASHBOARD_URL}">대시보드 바로가기</a></p></section></main></body></html>`);
 });
 app.post('/api/buy', async (req, res) => { const userId = currentUserId(req); const { itemType, key } = req.body; if (!userId || !['title', 'badge'].includes(itemType) || !key) return res.status(400).json({ error: '로그인 또는 userId, itemType, key가 필요해.' }); const Item = itemType === 'title' ? Title : Badge; const item = await Item.findOne({ key }).lean(); if (!item) return res.status(404).json({ error: '상점 아이템을 찾지 못했어.' }); const moneyData = await ensureMoney(userId); const currentMoney = toInt(moneyData.money, 0); if (currentMoney < item.price) return res.status(400).json({ error: `금전 부족! 필요 ${item.price}, 보유 ${currentMoney}` }); const field = itemType === 'title' ? 'titles' : 'badges'; const inv = await Inventory.findOne({ userId }); if (inv?.[field]?.includes(key)) return res.status(400).json({ error: '이미 가지고 있는 아이템이야.' }); await addMoney(userId, -item.price); await Inventory.updateOne({ userId }, { $addToSet: { [field]: key }, ...(itemType === 'title' ? { $setOnInsert: { activeTitle: key } } : {}) }, { upsert: true }); res.json({ ok: true, message: `${item.emoji} ${item.name} 구매 완료!` }); });
 app.post('/api/title/select', async (req, res) => { const userId = currentUserId(req); const { key } = req.body; const inv = await Inventory.findOne({ userId }); if (!inv?.titles?.includes(key)) return res.status(400).json({ error: '보유하지 않은 칭호야.' }); await Inventory.updateOne({ userId }, { $set: { activeTitle: key } }); res.json({ ok: true }); });
