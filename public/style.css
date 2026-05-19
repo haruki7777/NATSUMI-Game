@@ -1,4 +1,5 @@
 :root {
+  font-family: "Dalmoori", "Apple SD Gothic Neo", "Malgun Gothic", "Segoe UI", sans-serif;
   --bg: #0b0710;
   --panel: rgba(18, 13, 24, .82);
   --panel-strong: rgba(32, 22, 38, .9);
@@ -37,7 +38,7 @@ html { scroll-behavior: smooth; }
 body {
   margin: 0;
   min-height: 100vh;
-  font-family: "Apple SD Gothic Neo", "Malgun Gothic", "Segoe UI", sans-serif;
+  font-family: "Dalmoori", "Apple SD Gothic Neo", "Malgun Gothic", "Segoe UI", sans-serif;
   background: var(--bg);
   color: var(--text);
   overflow-x: hidden;
