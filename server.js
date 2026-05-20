@@ -20,10 +20,11 @@ const DISCORD_CLIENT_SECRET = process.env.DISCORD_CLIENT_SECRET || '';
 const DISCORD_BOT_TOKEN = process.env.DISCORD_BOT_TOKEN || process.env.TOKEN || '';
 const DISCORD_REDIRECT_URI = process.env.DISCORD_REDIRECT_URI || `${PUBLIC_BASE_URL}/auth/discord/callback`;
 const OWNER_USER_ID = process.env.OWNER_USER_ID || process.env.NATSUMI_OWNER_ID || '1293232804745838733';
-const DASHBOARD_URL = process.env.DASHBOARD_URL || 'https://haruki7777.github.io/natsumi-dashboard/';
+const DASHBOARD_URL = process.env.DASHBOARD_URL || 'http://natsumidashboard.kro.kr/';
 const SITE_URL = process.env.SITE_URL || PUBLIC_BASE_URL;
 const KOREANBOTS_TOKEN = process.env.KOREANBOTS_TOKEN || '';
 const KOREANBOTS_BOT_ID = process.env.KOREANBOTS_BOT_ID || '';
+const DEVELOPER_NOTICE_CHANNEL_ID = process.env.DEVELOPER_NOTICE_CHANNEL_ID || '1371675674393448528';
 const DISCORD_ADMINISTRATOR = 0x8n;
 const DISCORD_MANAGE_GUILD = 0x20n;
 const calculateXP = (level) => level * level * 100;
@@ -158,6 +159,18 @@ const DashboardQuestion = model('DashboardQuestion', new Schema({
   createdAt: { type: Date, default: Date.now },
   answeredAt: Date,
 }));
+const DeveloperAnnouncement = model('DeveloperAnnouncement', new Schema({
+  authorId: String,
+  authorName: String,
+  title: String,
+  message: String,
+  channelId: String,
+  status: { type: String, default: 'stored', index: true },
+  webhookId: String,
+  discordMessageId: String,
+  error: String,
+  createdAt: { type: Date, default: Date.now },
+}));
 const AnimeInventory = model('AnimeInventory', new Schema({
   userId: { type: String, required: true, unique: true },
   items: { type: Map, of: Number, default: {} }
@@ -276,6 +289,81 @@ async function fetchKoreanbotsStats() {
     return { servers: null, votes: null };
   }
 }
+async function fetchBotGuildCount() {
+  if (!DISCORD_BOT_TOKEN) return { servers: null, ok: false };
+  try {
+    const res = await fetch('https://discord.com/api/v10/users/@me/guilds', {
+      headers: { Authorization: `Bot ${DISCORD_BOT_TOKEN}` },
+    });
+    if (!res.ok) return { servers: null, ok: false };
+    const guilds = await res.json();
+    return { servers: Array.isArray(guilds) ? guilds.length : null, ok: true };
+  } catch {
+    return { servers: null, ok: false };
+  }
+}
+function formatUptime(seconds) {
+  const safe = Math.max(0, Math.floor(seconds || 0));
+  const days = Math.floor(safe / 86400);
+  const hours = Math.floor((safe % 86400) / 3600);
+  const minutes = Math.floor((safe % 3600) / 60);
+  if (days > 0) return `${days}일 ${hours}시간`;
+  if (hours > 0) return `${hours}시간 ${minutes}분`;
+  return `${minutes}분`;
+}
+async function sendDeveloperAnnouncement(row) {
+  if (!DISCORD_BOT_TOKEN || !DEVELOPER_NOTICE_CHANNEL_ID) {
+    return { ok: false, error: 'Discord bot token or channel id missing.' };
+  }
+  const headers = { Authorization: `Bot ${DISCORD_BOT_TOKEN}`, 'Content-Type': 'application/json' };
+  const payload = {
+    username: '나츠미 공지',
+    avatar_url: `${PUBLIC_BASE_URL}/favicon.ico`,
+    embeds: [{
+      title: `📢 ${row.title || '나츠미 지원서버 공지'}`,
+      description: row.message,
+      color: 0xff6d92,
+      footer: { text: 'NATSUMI Developer Notice' },
+      timestamp: new Date(row.createdAt || Date.now()).toISOString(),
+    }],
+  };
+
+  try {
+    const hooksRes = await fetch(`https://discord.com/api/v10/channels/${DEVELOPER_NOTICE_CHANNEL_ID}/webhooks`, { headers });
+    const hooks = hooksRes.ok ? await hooksRes.json() : [];
+    let hook = Array.isArray(hooks) ? hooks.find((item) => item.name === 'Natsumi Developer Notice') : null;
+    if (!hook) {
+      const createRes = await fetch(`https://discord.com/api/v10/channels/${DEVELOPER_NOTICE_CHANNEL_ID}/webhooks`, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({ name: 'Natsumi Developer Notice' }),
+      });
+      if (createRes.ok) hook = await createRes.json();
+    }
+    if (hook?.id && hook?.token) {
+      const sendRes = await fetch(`https://discord.com/api/v10/webhooks/${hook.id}/${hook.token}?wait=true`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+      if (sendRes.ok) {
+        const message = await sendRes.json();
+        return { ok: true, webhookId: hook.id, discordMessageId: message.id };
+      }
+    }
+
+    const fallbackRes = await fetch(`https://discord.com/api/v10/channels/${DEVELOPER_NOTICE_CHANNEL_ID}/messages`, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({ embeds: payload.embeds }),
+    });
+    if (!fallbackRes.ok) return { ok: false, error: `Discord ${fallbackRes.status}` };
+    const message = await fallbackRes.json();
+    return { ok: true, discordMessageId: message.id };
+  } catch (error) {
+    return { ok: false, error: error.message };
+  }
+}
 async function getProfile(guildId, userId) {
   const levelQuery = guildId && guildId !== 'demo-guild'
     ? { GuildID: guildId, UserID: userId }
@@ -330,20 +418,68 @@ app.get('/api/config', (req, res) => res.json({
 app.get('/api/stats', async (req, res) => {
   const [koreanbots, botGuilds] = await Promise.all([
     fetchKoreanbotsStats(),
-    DISCORD_BOT_TOKEN ? fetch('https://discord.com/api/v10/users/@me/guilds', { headers: { Authorization: `Bot ${DISCORD_BOT_TOKEN}` } }).then((r) => r.ok ? r.json() : []).catch(() => []) : [],
+    fetchBotGuildCount(),
   ]);
-  const discordServers = Array.isArray(botGuilds) ? botGuilds.length : null;
-  const servers = koreanbots.servers ?? discordServers;
+  const discordServers = botGuilds.servers;
+  const servers = discordServers ?? koreanbots.servers;
   res.json({
     servers,
     votes: koreanbots.votes,
     botServers: discordServers,
     koreanbotsServers: koreanbots.servers,
-    discord: { servers: discordServers },
+    discord: { servers: discordServers, ok: botGuilds.ok },
+    koreanbots,
+  });
+});
+app.get('/api/status', async (req, res) => {
+  const [koreanbots, discord] = await Promise.all([fetchKoreanbotsStats(), fetchBotGuildCount()]);
+  const uptimeSeconds = Math.floor(process.uptime());
+  res.json({
+    ok: true,
+    api: 'ok',
+    uptimeSeconds,
+    uptimeText: formatUptime(uptimeSeconds),
+    botServers: discord.servers,
+    votes: koreanbots.votes,
+    discordApiOk: discord.ok,
+    mongodbOk: mongoose.connection.readyState === 1,
+    checkedAt: new Date().toISOString(),
+    discord,
     koreanbots,
   });
 });
 app.get('/api/dashboard/session', (req, res) => res.json({ user: req.session?.discordUser || null, isOwner: isOwner(req) }));
+app.get('/api/developer-announcements', async (req, res) => {
+  const rows = await DeveloperAnnouncement.find().sort({ createdAt: -1 }).limit(10).lean();
+  res.json({ announcements: rows.map((row) => ({
+    id: row._id,
+    title: row.title,
+    message: row.message,
+    status: row.status,
+    createdAt: row.createdAt,
+  })) });
+});
+app.post('/api/developer-announcements', requireLogin, async (req, res) => {
+  if (!isOwner(req)) return res.status(403).json({ error: 'Only the developer can post announcements.' });
+  const title = String(req.body?.title || '나츠미 지원서버 공지').trim().slice(0, 120);
+  const message = String(req.body?.message || '').trim().slice(0, 1800);
+  if (!message) return res.status(400).json({ error: '공지 내용이 비어 있어.' });
+  const row = await DeveloperAnnouncement.create({
+    authorId: req.session.discordUser.id,
+    authorName: req.session.discordUser.globalName || req.session.discordUser.username,
+    title,
+    message,
+    channelId: DEVELOPER_NOTICE_CHANNEL_ID,
+    status: 'stored',
+  });
+  const sent = await sendDeveloperAnnouncement(row);
+  row.status = sent.ok ? 'sent' : 'stored';
+  row.webhookId = sent.webhookId;
+  row.discordMessageId = sent.discordMessageId;
+  row.error = sent.error;
+  await row.save();
+  res.json({ ok: true, announcement: row, sent: sent.ok, error: sent.ok ? undefined : sent.error });
+});
 app.get('/api/dashboard/guilds', requireLogin, async (req, res) => {
   const userGuilds = await fetchUserGuilds(req);
   const manageable = userGuilds.filter(isGuildAdmin);
