@@ -17,6 +17,24 @@ const fmt = (value) => Number(value || 0).toLocaleString("ko-KR");
 const storeKey = "natsumi-game-demo";
 const themeKey = "natsumi-game-theme";
 
+function mountPetalRain() {
+  if (document.querySelector(".petal-rain")) return;
+  const layer = document.createElement("div");
+  layer.className = "petal-rain";
+  layer.setAttribute("aria-hidden", "true");
+  layer.innerHTML = Array.from({ length: 10 }).map((_, index) => {
+    const x = 4 + Math.random() * 92;
+    const drift = -90 + Math.random() * 180;
+    const delay = -Math.random() * 12;
+    const dur = 11 + Math.random() * 8;
+    const size = 10 + Math.random() * 11;
+    const spin = 260 + Math.random() * 360;
+    const opacity = 0.46 + Math.random() * 0.36;
+    return `<span style="--x:${x}vw;--drift:${drift}px;--delay:${delay}s;--dur:${dur}s;--size:${size}px;--spin:${spin}deg;--petal-opacity:${opacity}" data-petal="${index}"></span>`;
+  }).join("");
+  document.body.appendChild(layer);
+}
+
 const gameDefs = {
   slot: { name: "픽셀 슬롯", icon: "slot", desc: "세 릴을 직접 멈춰 같은 문양을 노리는 아케이드 슬롯.", api: "/api/games/slot" },
   fishbun: { name: "붕어빵 뽑기", icon: "bun", desc: "진열대에서 하나를 고르면 따끈한 보상이 나와요.", api: "/api/games/fishbun" },
@@ -50,6 +68,7 @@ function getConfig() {
   const config = window.NATSUMI_CONFIG || {};
   return {
     apiBase: (config.API_BASE || "").replace(/\/$/, ""),
+    apiFallbackBase: (config.API_FALLBACK_BASE || "").replace(/\/$/, ""),
     defaultGuildId: config.DEFAULT_GUILD_ID || "",
     donationUrl: config.DONATION_URL || "",
     donationAccount: config.DONATION_ACCOUNT || "",
@@ -61,12 +80,19 @@ function getConfig() {
 }
 
 async function loadServerConfig(baseConfig) {
+  const bases = [...new Set([baseConfig.apiBase, baseConfig.apiFallbackBase].filter(Boolean))];
+  let lastError = null;
+  for (const apiBase of bases) {
   try {
-    const res = await fetch(`${baseConfig.apiBase || ""}/api/config`, { credentials: "include" });
-    if (!res.ok) return baseConfig;
+    const res = await fetch(`${apiBase}/api/config`, { credentials: "include" });
+    if (!res.ok) {
+      lastError = new Error(`config ${res.status}`);
+      continue;
+    }
     const serverConfig = await res.json();
     return {
       ...baseConfig,
+      apiBase,
       defaultGuildId: serverConfig.defaultGuildId || baseConfig.defaultGuildId,
       donationUrl: serverConfig.donationUrl || baseConfig.donationUrl,
       donationAccount: serverConfig.donationAccount || baseConfig.donationAccount,
@@ -77,9 +103,12 @@ async function loadServerConfig(baseConfig) {
       discordRedirectUri: serverConfig.discordRedirectUri || "",
       supportTiers: Array.isArray(serverConfig.supportTiers) ? serverConfig.supportTiers : baseConfig.supportTiers
     };
-  } catch {
-    return baseConfig;
+  } catch (error) {
+    lastError = error;
   }
+  }
+  if (baseConfig.apiFallbackBase) return { ...baseConfig, apiBase: baseConfig.apiFallbackBase, apiConfigError: lastError?.message || "fallback" };
+  return baseConfig;
 }
 
 function readAll() {
@@ -690,6 +719,7 @@ function bindUiEvents() {
 }
 
 async function init() {
+  mountPetalRain();
   initTheme();
   state.config = await loadServerConfig(getConfig());
   bindUiEvents();

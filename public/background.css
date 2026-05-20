@@ -30,6 +30,49 @@ body::after {
   opacity: .52;
 }
 
+.petal-rain {
+  pointer-events: none;
+  position: fixed;
+  inset: 0;
+  z-index: 4;
+  overflow: hidden;
+}
+
+.petal-rain span {
+  position: absolute;
+  top: -8vh;
+  left: var(--x);
+  width: var(--size);
+  height: calc(var(--size) * 1.35);
+  border-radius: 70% 20% 70% 20%;
+  background: linear-gradient(135deg, rgba(255, 185, 213, .86), rgba(255, 111, 170, .58));
+  filter: drop-shadow(0 7px 10px rgba(255, 103, 164, .2));
+  opacity: var(--petal-opacity);
+  animation: game-petal-fall var(--dur) linear infinite;
+  animation-delay: var(--delay);
+}
+
+@keyframes game-petal-fall {
+  0% {
+    transform: translate3d(0, -10vh, 0) rotate(0deg);
+    opacity: 0;
+  }
+  10%,
+  84% {
+    opacity: var(--petal-opacity);
+  }
+  35% {
+    transform: translate3d(calc(var(--drift) * .28), 34vh, 0) rotate(calc(var(--spin) * .3));
+  }
+  66% {
+    transform: translate3d(calc(var(--drift) * -.22), 70vh, 0) rotate(calc(var(--spin) * .66));
+  }
+  100% {
+    transform: translate3d(var(--drift), 112vh, 0) rotate(var(--spin));
+    opacity: 0;
+  }
+}
+
 .hero-card {
   position: relative;
   overflow: hidden;
