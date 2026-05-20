@@ -23,6 +23,7 @@ const DISCORD_REDIRECT_URI = process.env.DISCORD_REDIRECT_URI || `${PUBLIC_BASE_
 const OWNER_USER_ID = process.env.OWNER_USER_ID || process.env.NATSUMI_OWNER_ID || '1293232804745838733';
 const DASHBOARD_URL = process.env.DASHBOARD_URL || 'https://natsumidashboard.kro.kr/';
 const SITE_URL = process.env.SITE_URL || PUBLIC_BASE_URL;
+const BOT_API_BASE_URL = process.env.BOT_API_BASE_URL || process.env.NATSUMI_BOT_API_BASE_URL || '';
 const KOREANBOTS_TOKEN = process.env.KOREANBOTS_TOKEN || '';
 const KOREANBOTS_BOT_ID = process.env.KOREANBOTS_BOT_ID || '';
 const DEVELOPER_NOTICE_CHANNEL_ID = process.env.DEVELOPER_NOTICE_CHANNEL_ID || '1371675674393448528';
@@ -333,6 +334,22 @@ async function fetchBotGuildCount() {
     return { servers: null, ok: false };
   }
 }
+async function fetchBotRuntimeStatus() {
+  if (!BOT_API_BASE_URL) return null;
+  try {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 5000);
+    const url = BOT_API_BASE_URL.endsWith('/api/status')
+      ? BOT_API_BASE_URL
+      : `${BOT_API_BASE_URL.replace(/\/$/, '')}/api/status`;
+    const res = await fetch(url, { headers: { Accept: 'application/json' }, signal: controller.signal });
+    clearTimeout(timeout);
+    if (!res.ok) return null;
+    return res.json();
+  } catch {
+    return null;
+  }
+}
 function formatUptime(seconds) {
   const safe = Math.max(0, Math.floor(seconds || 0));
   const days = Math.floor(safe / 86400);
@@ -518,19 +535,19 @@ app.get('/api/stats', async (req, res) => {
   });
 });
 app.get('/api/status', async (req, res) => {
-  const [koreanbots, discord] = await Promise.all([fetchKoreanbotsStats(), fetchBotGuildCount()]);
-  const uptimeSeconds = Math.floor(process.uptime());
+  const [koreanbots, discord, botRuntime] = await Promise.all([fetchKoreanbotsStats(), fetchBotGuildCount(), fetchBotRuntimeStatus()]);
+  const uptimeSeconds = Number(botRuntime?.uptime || botRuntime?.uptimeSeconds || 0) || Math.floor(process.uptime());
   res.json({
     ok: true,
     api: 'ok',
     uptimeSeconds,
     uptimeText: formatUptime(uptimeSeconds),
-    botServers: discord.servers,
+    botServers: discord.servers ?? botRuntime?.guilds ?? null,
     votes: koreanbots.votes,
-    discordApiOk: discord.ok,
-    mongodbOk: mongoose.connection.readyState === 1,
+    discordApiOk: discord.ok || Boolean(botRuntime?.guilds),
+    mongodbOk: botRuntime?.mongodbOk ?? mongoose.connection.readyState === 1,
     checkedAt: new Date().toISOString(),
-    discord,
+    discord: { ...discord, servers: discord.servers ?? botRuntime?.guilds ?? null },
     koreanbots,
   });
 });
