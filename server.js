@@ -272,6 +272,28 @@ async function fetchBotGuildChannels(guildId) {
     type: channel.type === 0 ? 'text' : channel.type === 2 ? 'voice' : channel.type === 4 ? 'category' : 'other',
   })).filter((channel) => channel.type !== 'other');
 }
+async function sendGuildNoticeMessage(channelId, message) {
+  if (!DISCORD_BOT_TOKEN || !channelId || !message) return { ok: false, error: 'missing channel or token' };
+  try {
+    const res = await fetch(`https://discord.com/api/v10/channels/${channelId}/messages`, {
+      method: 'POST',
+      headers: { Authorization: `Bot ${DISCORD_BOT_TOKEN}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        embeds: [{
+          title: '📢 나츠미 공지',
+          description: message,
+          color: 0xff6d92,
+          timestamp: new Date().toISOString(),
+        }],
+      }),
+    });
+    if (!res.ok) return { ok: false, error: `Discord ${res.status}` };
+    const data = await res.json();
+    return { ok: true, messageId: data.id };
+  } catch (error) {
+    return { ok: false, error: error.message };
+  }
+}
 async function fetchKoreanbotsStats() {
   if (!KOREANBOTS_BOT_ID) return { servers: null, votes: null };
   try {
@@ -560,15 +582,20 @@ app.patch('/api/dashboard/guilds/:guildId/settings', requireLogin, requireGuildA
 });
 app.post('/api/dashboard/guilds/:guildId/notice', requireLogin, requireGuildAdmin, async (req, res) => {
   const message = String(req.body?.notice?.message || '').trim().slice(0, 1800);
+  const channelId = String(req.body?.notice?.channelId || '').trim();
   if (!message) return res.status(400).json({ error: '공지 내용이 비어 있어.' });
+  if (!channelId) return res.status(400).json({ error: '공지 채널을 선택해줘.' });
   const row = await DashboardNotice.create({
     guildId: req.params.guildId,
     authorId: req.session.discordUser.id,
     authorName: req.session.discordUser.globalName || req.session.discordUser.username,
     message,
-    status: isOwner(req) ? 'approved' : 'pending',
+    status: 'pending',
   });
-  res.json({ ok: true, notice: row, needsDeveloperReview: row.status === 'pending' });
+  const sent = await sendGuildNoticeMessage(channelId, message);
+  row.status = sent.ok ? 'sent' : 'failed';
+  await row.save();
+  res.json({ ok: sent.ok, notice: row, sent: sent.ok, messageId: sent.messageId, error: sent.error });
 });
 app.get('/api/dashboard/guilds/:guildId/questions', requireLogin, requireGuildAdmin, async (req, res) => {
   const rows = await DashboardQuestion.find({ guildId: req.params.guildId }).sort({ createdAt: -1 }).limit(50).lean();
