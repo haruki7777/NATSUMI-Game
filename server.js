@@ -397,8 +397,57 @@ async function getProfile(guildId, userId) {
   };
 }
 
-app.get('/auth/discord', (req, res) => { if (!DISCORD_CLIENT_ID) return res.status(500).send('DISCORD_CLIENT_ID가 필요해.'); const state = Math.random().toString(36).slice(2); req.session.oauthState = state; req.session.oauthReturnTo = typeof req.query.returnTo === 'string' ? req.query.returnTo : '/'; const params = new URLSearchParams({ client_id: DISCORD_CLIENT_ID, redirect_uri: DISCORD_REDIRECT_URI, response_type: 'code', scope: 'identify guilds', state }); res.redirect(`https://discord.com/api/oauth2/authorize?${params.toString()}`); });
-app.get('/auth/discord/callback', async (req, res) => { try { if (!req.query.code || req.query.state !== req.session.oauthState) return res.status(400).send('OAuth state가 맞지 않아.'); const tokenRes = await fetch('https://discord.com/api/oauth2/token', { method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, body: new URLSearchParams({ client_id: DISCORD_CLIENT_ID, client_secret: DISCORD_CLIENT_SECRET, grant_type: 'authorization_code', code: String(req.query.code), redirect_uri: DISCORD_REDIRECT_URI }) }); const token = await tokenRes.json(); if (!token.access_token) return res.status(400).json(token); const userRes = await fetch('https://discord.com/api/users/@me', { headers: { Authorization: `Bearer ${token.access_token}` } }); const user = await userRes.json(); req.session.discordAccessToken = token.access_token; req.session.discordUser = { id: user.id, username: user.username, globalName: user.global_name, avatar: user.avatar }; const returnTo = req.session.oauthReturnTo || '/'; delete req.session.oauthReturnTo; res.redirect(returnTo); } catch (err) { console.error(err); res.status(500).send('Discord 로그인 실패'); } });
+function startDiscordAuth(req, res, returnTo, redirectUri) {
+  if (!DISCORD_CLIENT_ID) return res.status(500).send('DISCORD_CLIENT_ID가 필요해.');
+  const state = Math.random().toString(36).slice(2);
+  req.session.oauthState = state;
+  req.session.oauthReturnTo = returnTo || '/';
+  req.session.oauthRedirectUri = redirectUri;
+  const params = new URLSearchParams({
+    client_id: DISCORD_CLIENT_ID,
+    redirect_uri: redirectUri,
+    response_type: 'code',
+    scope: 'identify guilds',
+    state,
+  });
+  return res.redirect(`https://discord.com/api/oauth2/authorize?${params.toString()}`);
+}
+async function finishDiscordAuth(req, res, redirectUri) {
+  try {
+    const expectedRedirectUri = req.session.oauthRedirectUri || redirectUri;
+    if (!req.query.code || req.query.state !== req.session.oauthState) return res.status(400).send('OAuth state가 맞지 않아.');
+    const tokenRes = await fetch('https://discord.com/api/oauth2/token', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: new URLSearchParams({
+        client_id: DISCORD_CLIENT_ID,
+        client_secret: DISCORD_CLIENT_SECRET,
+        grant_type: 'authorization_code',
+        code: String(req.query.code),
+        redirect_uri: expectedRedirectUri,
+      }),
+    });
+    const token = await tokenRes.json();
+    if (!token.access_token) return res.status(400).json(token);
+    const userRes = await fetch('https://discord.com/api/users/@me', { headers: { Authorization: `Bearer ${token.access_token}` } });
+    const user = await userRes.json();
+    req.session.discordAccessToken = token.access_token;
+    req.session.discordUser = { id: user.id, username: user.username, globalName: user.global_name, avatar: user.avatar };
+    const returnTo = req.session.oauthReturnTo || '/';
+    delete req.session.oauthReturnTo;
+    delete req.session.oauthRedirectUri;
+    return res.redirect(returnTo);
+  } catch (err) {
+    console.error(err);
+    return res.status(500).send('Discord 로그인 실패');
+  }
+}
+app.get('/auth/discord', (req, res) => startDiscordAuth(req, res, typeof req.query.returnTo === 'string' ? req.query.returnTo : '/', DISCORD_REDIRECT_URI));
+app.get('/auth/discord/callback', (req, res) => finishDiscordAuth(req, res, DISCORD_REDIRECT_URI));
+app.get('/auth/discord/dashboard', (req, res) => startDiscordAuth(req, res, DASHBOARD_URL, `${PUBLIC_BASE_URL}/auth/discord/dashboard/callback`));
+app.get('/auth/discord/dashboard/callback', (req, res) => finishDiscordAuth(req, res, `${PUBLIC_BASE_URL}/auth/discord/dashboard/callback`));
+app.get('/auth/discord/game', (req, res) => startDiscordAuth(req, res, SITE_URL, `${PUBLIC_BASE_URL}/auth/discord/game/callback`));
+app.get('/auth/discord/game/callback', (req, res) => finishDiscordAuth(req, res, `${PUBLIC_BASE_URL}/auth/discord/game/callback`));
 app.post('/auth/logout', (req, res) => req.session.destroy(() => res.json({ ok: true })));
 app.get('/api/me', (req, res) => res.json({ user: req.session?.discordUser || null }));
 app.get('/api/config', (req, res) => res.json({
