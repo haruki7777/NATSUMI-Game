@@ -20,7 +20,7 @@ const DISCORD_CLIENT_SECRET = process.env.DISCORD_CLIENT_SECRET || '';
 const DISCORD_BOT_TOKEN = process.env.DISCORD_BOT_TOKEN || process.env.TOKEN || '';
 const DISCORD_REDIRECT_URI = process.env.DISCORD_REDIRECT_URI || `${PUBLIC_BASE_URL}/auth/discord/callback`;
 const OWNER_USER_ID = process.env.OWNER_USER_ID || process.env.NATSUMI_OWNER_ID || '1293232804745838733';
-const DASHBOARD_URL = process.env.DASHBOARD_URL || 'http://natsumidashboard.kro.kr/';
+const DASHBOARD_URL = process.env.DASHBOARD_URL || 'https://natsumidashboard.kro.kr/';
 const SITE_URL = process.env.SITE_URL || PUBLIC_BASE_URL;
 const KOREANBOTS_TOKEN = process.env.KOREANBOTS_TOKEN || '';
 const KOREANBOTS_BOT_ID = process.env.KOREANBOTS_BOT_ID || '';
@@ -73,7 +73,7 @@ async function sendOwnerSupportDm(row, tier) {
 
 app.use(express.json());
 app.use((req, res, next) => {
-  const allowed = (process.env.ALLOWED_ORIGINS || process.env.ALLOWED_ORIGIN || `${DASHBOARD_URL},${SITE_URL}`)
+  const allowed = (process.env.ALLOWED_ORIGINS || process.env.ALLOWED_ORIGIN || `${DASHBOARD_URL},${SITE_URL},https://natsumi-game.kro.kr,https://natsumi-site.kro.kr`)
     .split(',')
     .map((origin) => origin.trim().replace(/\/$/, ''))
     .filter(Boolean);
