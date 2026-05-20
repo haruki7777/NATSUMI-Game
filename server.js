@@ -99,7 +99,7 @@ app.use(session({
   secret: process.env.SESSION_SECRET || 'change-this-natsumi-secret',
   resave: false,
   saveUninitialized: false,
-  cookie: { maxAge: 1000 * 60 * 60 * 24 * 14, sameSite: PUBLIC_BASE_URL.startsWith('https://') ? 'none' : 'lax', secure: PUBLIC_BASE_URL.startsWith('https://') }
+  cookie: { maxAge: 1000 * 60 * 60 * 24 * 14, sameSite: 'lax', secure: 'auto' }
 }));
 app.use(express.static(path.join(__dirname, 'public')));
 
@@ -428,6 +428,12 @@ async function getProfile(guildId, userId) {
   };
 }
 
+function publicBaseUrl(req) {
+  if (process.env.PUBLIC_BASE_URL) return process.env.PUBLIC_BASE_URL.replace(/\/$/, '');
+  const proto = req.headers['x-forwarded-proto'] || req.protocol || 'http';
+  return `${proto}://${req.headers.host}`.replace(/\/$/, '');
+}
+
 function startDiscordAuth(req, res, returnTo, redirectUri) {
   if (!DISCORD_CLIENT_ID) return res.status(500).send('DISCORD_CLIENT_ID가 필요해.');
   const state = Math.random().toString(36).slice(2);
@@ -473,12 +479,12 @@ async function finishDiscordAuth(req, res, redirectUri) {
     return res.status(500).send('Discord 로그인 실패');
   }
 }
-app.get('/auth/discord', (req, res) => startDiscordAuth(req, res, typeof req.query.returnTo === 'string' ? req.query.returnTo : '/', DISCORD_REDIRECT_URI));
-app.get('/auth/discord/callback', (req, res) => finishDiscordAuth(req, res, DISCORD_REDIRECT_URI));
-app.get('/auth/discord/dashboard', (req, res) => startDiscordAuth(req, res, DASHBOARD_URL, `${PUBLIC_BASE_URL}/auth/discord/dashboard/callback`));
-app.get('/auth/discord/dashboard/callback', (req, res) => finishDiscordAuth(req, res, `${PUBLIC_BASE_URL}/auth/discord/dashboard/callback`));
-app.get('/auth/discord/game', (req, res) => startDiscordAuth(req, res, SITE_URL, `${PUBLIC_BASE_URL}/auth/discord/game/callback`));
-app.get('/auth/discord/game/callback', (req, res) => finishDiscordAuth(req, res, `${PUBLIC_BASE_URL}/auth/discord/game/callback`));
+app.get('/auth/discord', (req, res) => startDiscordAuth(req, res, typeof req.query.returnTo === 'string' ? req.query.returnTo : '/', `${publicBaseUrl(req)}/auth/discord/callback`));
+app.get('/auth/discord/callback', (req, res) => finishDiscordAuth(req, res, `${publicBaseUrl(req)}/auth/discord/callback`));
+app.get('/auth/discord/dashboard', (req, res) => startDiscordAuth(req, res, DASHBOARD_URL, `${publicBaseUrl(req)}/auth/discord/dashboard/callback`));
+app.get('/auth/discord/dashboard/callback', (req, res) => finishDiscordAuth(req, res, `${publicBaseUrl(req)}/auth/discord/dashboard/callback`));
+app.get('/auth/discord/game', (req, res) => startDiscordAuth(req, res, SITE_URL, `${publicBaseUrl(req)}/auth/discord/game/callback`));
+app.get('/auth/discord/game/callback', (req, res) => finishDiscordAuth(req, res, `${publicBaseUrl(req)}/auth/discord/game/callback`));
 app.post('/auth/logout', (req, res) => req.session.destroy(() => res.json({ ok: true })));
 app.get('/api/me', (req, res) => res.json({ user: req.session?.discordUser || null }));
 app.get('/api/config', (req, res) => res.json({
