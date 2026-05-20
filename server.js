@@ -8,6 +8,7 @@ import { fileURLToPath } from 'url';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const app = express();
+app.set('trust proxy', 1);
 
 const PORT = process.env.PORT || 3000;
 const DEFAULT_GUILD_ID = process.env.DEFAULT_GUILD_ID || '';
@@ -73,7 +74,15 @@ async function sendOwnerSupportDm(row, tier) {
 
 app.use(express.json());
 app.use((req, res, next) => {
-  const allowed = (process.env.ALLOWED_ORIGINS || process.env.ALLOWED_ORIGIN || `${DASHBOARD_URL},${SITE_URL},https://natsumi-game.kro.kr,https://natsumi-site.kro.kr`)
+  const forceHttps = String(process.env.FORCE_HTTPS || '').toLowerCase() === 'true';
+  const forwardedProto = req.headers['x-forwarded-proto'];
+  if (forceHttps && forwardedProto && forwardedProto !== 'https') {
+    return res.redirect(301, `https://${req.headers.host}${req.originalUrl}`);
+  }
+  next();
+});
+app.use((req, res, next) => {
+  const allowed = (process.env.ALLOWED_ORIGINS || process.env.ALLOWED_ORIGIN || `${DASHBOARD_URL},${SITE_URL},https://natsumi-game.kro.kr,https://natsumi-site.kro.kr,https://api.natsumidashboard.kro.kr`)
     .split(',')
     .map((origin) => origin.trim().replace(/\/$/, ''))
     .filter(Boolean);
