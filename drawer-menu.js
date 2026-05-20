@@ -2,6 +2,20 @@
   function ready(fn){document.readyState==='loading'?document.addEventListener('DOMContentLoaded',fn):fn()}
   ready(()=>{
     const body=document.body;
+    const petals=document.querySelector('#arcadePetals');
+    if(petals&&!petals.children.length){
+      for(let i=0;i<10;i++){
+        const petal=document.createElement('span');
+        petal.style.setProperty('--x',`${4+Math.random()*92}vw`);
+        petal.style.setProperty('--drift',`${-90+Math.random()*180}px`);
+        petal.style.setProperty('--delay',`${-Math.random()*12}s`);
+        petal.style.setProperty('--dur',`${11+Math.random()*8}s`);
+        petal.style.setProperty('--size',`${10+Math.random()*12}px`);
+        petal.style.setProperty('--spin',`${260+Math.random()*420}deg`);
+        petal.style.setProperty('--petal-opacity',`${0.46+Math.random()*0.38}`);
+        petals.appendChild(petal);
+      }
+    }
     const menu=document.querySelector('#drawerMenu');
     const openBtn=document.querySelector('#menuToggle');
     const closeBtn=document.querySelector('#menuClose');

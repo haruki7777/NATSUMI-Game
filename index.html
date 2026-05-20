@@ -10,6 +10,7 @@
   <link rel="stylesheet" href="./drawer-menu.css" />
 </head>
 <body>
+  <div id="arcadePetals" class="arcade-petals" aria-hidden="true"></div>
   <div class="bg-orb orb-a"></div><div class="bg-orb orb-b"></div>
   <div id="menuBackdrop" class="menu-backdrop"></div>
   <header class="topbar">
@@ -34,6 +35,14 @@
   </header>
 
   <main id="home" class="layout">
+    <section class="arcade-menu-panel" aria-label="game center menu">
+      <button data-view="profile" class="nav-btn active">프로필</button>
+      <button data-view="games" class="nav-btn">게임</button>
+      <button data-view="shop" class="nav-btn">상점</button>
+      <button data-view="support" class="nav-btn">후원</button>
+      <button data-view="rank" class="nav-btn">랭크카드</button>
+    </section>
+
     <section class="hero-card">
       <div>
         <p class="eyebrow">FOX GAME PORTAL</p>
