@@ -151,3 +151,8 @@ body{background:#120719;color:var(--text);text-rendering:geometricPrecision}
 .stage-mole .mole-grid,.stage-mine .mine-grid,.stage-fishbun .bun-machine,.stage-anime .gacha-machine{filter:drop-shadow(0 10px 0 rgba(0,0,0,.22))}
 @keyframes fishCaughtPop{0%{opacity:.65;transform:translateX(-50%) translateY(24px) rotate(-6deg) scale(.86)}58%{opacity:1;transform:translateX(-50%) translateY(-26px) rotate(12deg) scale(1.24)}100%{opacity:1;transform:translateX(-50%) translateY(-8px) rotate(-10deg) scale(1.1)}}
 @keyframes bubbleRise{0%{transform:translateY(12px);opacity:.2}100%{transform:translateY(-18px);opacity:1}}
+
+/* Mobile arcade tap stability */
+button,.bobber,.mole-cell,.mine-cell,.bun-pick,.reel,.gacha-lever,#playGameBtn{touch-action:manipulation;-webkit-tap-highlight-color:transparent;-webkit-user-select:none;user-select:none}
+.stage-fishing,.stage-mole,.mole-grid,.fishing-scene,.game-stage{touch-action:manipulation}
+@media(max-width:760px){.stage-fishing .bobber,.mole-cell,#catchFishBtn{touch-action:manipulation}.mole-grid{overscroll-behavior:contain}}

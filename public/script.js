@@ -687,9 +687,23 @@ function initTheme() {
   });
 }
 
+function preventRapidGameTapZoom() {
+  let lastTouchEnd = 0;
+  document.addEventListener("touchend", (event) => {
+    const gameTapTarget = event.target?.closest?.(".stage-fishing, .stage-mole, .mole-grid, .mole-cell, #catchFishBtn");
+    if (!gameTapTarget) return;
+    const now = Date.now();
+    if (now - lastTouchEnd <= 320) {
+      event.preventDefault();
+    }
+    lastTouchEnd = now;
+  }, { passive: false });
+}
+
 function bindUiEvents() {
   if (window.__natsumiUiBound) return;
   window.__natsumiUiBound = true;
+  preventRapidGameTapZoom();
   $("#loadBtn")?.addEventListener("click", loadProfile);
   $("#playGameBtn")?.addEventListener("click", playGame);
   $("#supportApplyBtn")?.addEventListener("click", applySupportRequest);
