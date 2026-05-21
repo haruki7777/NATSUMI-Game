@@ -21,7 +21,7 @@ const DISCORD_CLIENT_SECRET = process.env.DISCORD_CLIENT_SECRET || '';
 const DISCORD_BOT_TOKEN = process.env.DISCORD_BOT_TOKEN || process.env.TOKEN || '';
 const DISCORD_REDIRECT_URI = process.env.DISCORD_REDIRECT_URI || `${PUBLIC_BASE_URL}/auth/discord/callback`;
 const OWNER_USER_ID = process.env.OWNER_USER_ID || process.env.NATSUMI_OWNER_ID || '1293232804745838733';
-const DASHBOARD_URL = process.env.DASHBOARD_URL || 'https://natsumidashboard.kro.kr/';
+const DASHBOARD_URL = process.env.DASHBOARD_URL || 'http://natsumidashboard.kro.kr:25901/';
 const SITE_URL = process.env.SITE_URL || PUBLIC_BASE_URL;
 const BOT_API_BASE_URL = process.env.BOT_API_BASE_URL || process.env.NATSUMI_BOT_API_BASE_URL || '';
 const KOREANBOTS_TOKEN = process.env.KOREANBOTS_TOKEN || '';
@@ -451,6 +451,11 @@ function publicBaseUrl(req) {
   return `${proto}://${req.headers.host}`.replace(/\/$/, '');
 }
 
+function requestBaseUrl(req) {
+  const proto = req.headers['x-forwarded-proto'] || req.protocol || 'http';
+  return `${proto}://${req.headers.host}`.replace(/\/$/, '');
+}
+
 function startDiscordAuth(req, res, returnTo, redirectUri) {
   if (!DISCORD_CLIENT_ID) return res.status(500).send('DISCORD_CLIENT_ID가 필요해.');
   const state = Math.random().toString(36).slice(2);
@@ -500,8 +505,8 @@ app.get('/auth/discord', (req, res) => startDiscordAuth(req, res, typeof req.que
 app.get('/auth/discord/callback', (req, res) => finishDiscordAuth(req, res, `${publicBaseUrl(req)}/auth/discord/callback`));
 app.get('/auth/discord/dashboard', (req, res) => startDiscordAuth(req, res, DASHBOARD_URL, `${publicBaseUrl(req)}/auth/discord/dashboard/callback`));
 app.get('/auth/discord/dashboard/callback', (req, res) => finishDiscordAuth(req, res, `${publicBaseUrl(req)}/auth/discord/dashboard/callback`));
-app.get('/auth/discord/game', (req, res) => startDiscordAuth(req, res, `${publicBaseUrl(req)}/`, `${publicBaseUrl(req)}/auth/discord/game/callback`));
-app.get('/auth/discord/game/callback', (req, res) => finishDiscordAuth(req, res, `${publicBaseUrl(req)}/auth/discord/game/callback`));
+app.get('/auth/discord/game', (req, res) => startDiscordAuth(req, res, `${requestBaseUrl(req)}/`, `${requestBaseUrl(req)}/auth/discord/game/callback`));
+app.get('/auth/discord/game/callback', (req, res) => finishDiscordAuth(req, res, `${requestBaseUrl(req)}/auth/discord/game/callback`));
 app.post('/auth/logout', (req, res) => req.session.destroy(() => res.json({ ok: true })));
 app.get('/api/me', (req, res) => res.json({ user: req.session?.discordUser || null }));
 app.get('/api/config', (req, res) => res.json({
