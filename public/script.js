@@ -143,7 +143,7 @@ function currentUserId() {
 }
 
 function authUrl() {
-  return `${state.config.apiBase || ""}/auth/discord`;
+  return `${state.config.apiBase || ""}/auth/discord/game`;
 }
 
 function goLogin() {

@@ -410,14 +410,36 @@ a { color: inherit; text-decoration: none; }
 .support-form textarea { min-height: 96px; resize: vertical; }
 .rank-preview { padding: 24px; }
 .float-donate {
-  position: fixed;
-  right: 18px;
-  bottom: 18px;
-  z-index: 45;
+  display: inline-flex;
+  width: fit-content;
+  margin: 18px auto 0;
   border-radius: 999px;
   padding: 13px 17px;
   background: linear-gradient(135deg, var(--accent), var(--pink));
   font-weight: 1000;
+  box-shadow: var(--shadow);
+}
+
+.policy-footer {
+  position: static;
+  z-index: auto;
+  display: flex;
+  justify-content: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  max-width: 100%;
+  margin: 18px auto 0;
+  padding: 0 12px 28px;
+}
+
+.policy-footer a {
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--panel-strong);
+  color: var(--text);
+  padding: 9px 12px;
+  font-size: 13px;
+  font-weight: 900;
   box-shadow: var(--shadow);
 }
 
@@ -478,5 +500,5 @@ a { color: inherit; text-decoration: none; }
   .bet-row { flex-direction: column; }
   .stats, .support-grid { grid-template-columns: 1fr; }
   .cards { grid-template-columns: 1fr; }
-  .float-donate { right: 10px; bottom: 10px; }
+  .float-donate { margin-top: 14px; }
 }
