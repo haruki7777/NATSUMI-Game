@@ -32,6 +32,8 @@
         <button data-view="games" class="nav-btn" type="button">게임센터</button>
         <button data-view="inventory" class="nav-btn" type="button">가방/도감</button>
         <button data-view="shop" class="nav-btn" type="button">상점</button>
+        <button data-view="xpShop" class="nav-btn" type="button">경험치 상점</button>
+        <button data-view="premium" class="nav-btn" type="button">프리미엄</button>
         <button data-view="support" class="nav-btn" type="button">후원</button>
         <button data-view="rank" class="nav-btn" type="button">랭크카드</button>
         <a class="nav-btn" href="http://natsumidashboard.kro.kr:25901/" target="_blank" rel="noreferrer">대시보드</a>
@@ -118,6 +120,32 @@
         <button class="tab" data-tab="badges" type="button">배지</button>
       </div>
       <div id="shopArea" class="cards"></div>
+    </section>
+
+    <section id="xpShopView" class="view">
+      <div class="section-head">
+        <p class="eyebrow">XP SHOP</p>
+        <h2>경험치 상점</h2>
+      </div>
+      <div id="xpShopArea" class="cards">프로필을 불러오면 경험치로 살 수 있는 꾸미기 상품이 보여요.</div>
+    </section>
+
+    <section id="premiumView" class="view">
+      <div class="section-head">
+        <p class="eyebrow">PREMIUM</p>
+        <h2>프리미엄 기능</h2>
+      </div>
+      <div class="support-grid">
+        <article class="support-card supporter-glow">
+          <h3>출석 역할</h3>
+          <p>서버 대시보드에서 출석 역할 보상을 지정하면 출석 기록에 맞춰 역할 보상을 줄 수 있어요.</p>
+        </article>
+        <article class="support-card supporter-glow">
+          <h3>커스텀 랭크카드</h3>
+          <p>경험치 상점에서 프레임과 반짝 효과를 산 뒤 랭크카드를 꾸밀 수 있게 준비했어요.</p>
+        </article>
+      </div>
+      <div id="premiumArea" class="cards"></div>
     </section>
 
     <section id="supportView" class="view">

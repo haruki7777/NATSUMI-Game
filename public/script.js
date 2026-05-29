@@ -8,6 +8,7 @@ let state = {
   me: null,
   game: "slot",
   bag: null,
+  xpShop: null,
   mole: null,
   session: null
 };
@@ -182,6 +183,7 @@ function showView(name) {
   $(`#${name}View`)?.classList.add("active-view");
   document.querySelectorAll(".nav-btn").forEach((button) => button.classList.toggle("active", button.dataset.view === name));
   if (name === "inventory") loadBag();
+  if (name === "xpShop" || name === "premium") loadXpShop();
   window.scrollTo({ top: 0, behavior: "smooth" });
 }
 
@@ -229,6 +231,28 @@ function renderShop() {
   const list = state.tab === "titles" ? state.shop.titles : state.shop.badges;
   $("#shopArea").innerHTML = list.map((item) => itemCard(item, state.tab === "titles" ? "title" : "badge")).join("");
   document.querySelectorAll("[data-buy]").forEach((button) => button.addEventListener("click", buyItem));
+}
+
+function xpShopCard(item) {
+  const owned = state.profile?.ownedBadges?.some((ownedItem) => ownedItem.key === `xp_shop_${item.key}`)
+    || state.profile?.ownedTitles?.some((ownedItem) => ownedItem.key === `xp_shop_${item.key}`);
+  return `<article class="item pixel-shop-item">
+    <div class="shop-vending-window">${pixelIcon(item.premium ? "heart" : "spark")}<span class="emoji">${item.emoji || "XP"}</span></div>
+    <h3>${item.name}</h3>
+    <small>${item.description}</small>
+    <p><b>${fmt(item.xpPrice)}</b> 경험치</p>
+    <button data-xp-buy="${item.key}" type="button" ${owned ? "disabled" : ""}>${owned ? "이미 보유중" : "경험치로 구매"}</button>
+  </article>`;
+}
+
+function renderXpShop() {
+  const items = state.xpShop?.items || [];
+  const premium = state.xpShop?.premium || items.filter((item) => item.premium);
+  const xpArea = $("#xpShopArea");
+  const premiumArea = $("#premiumArea");
+  if (xpArea) xpArea.innerHTML = items.length ? items.map(xpShopCard).join("") : "경험치 상점 상품을 불러오는 중이에요.";
+  if (premiumArea) premiumArea.innerHTML = premium.length ? premium.map(xpShopCard).join("") : "";
+  document.querySelectorAll("[data-xp-buy]").forEach((button) => button.addEventListener("click", buyXpItem));
 }
 
 function renderGames() {
@@ -432,6 +456,29 @@ async function buyItem(event) {
   } catch (error) {
     showPixelResult({ title: "SHOP FAIL", lines: [error.message], tone: "bad" });
   }
+}
+
+async function buyXpItem(event) {
+  if (!requireLogin()) return;
+  if (event.currentTarget.disabled) return;
+  try {
+    const data = await api("/api/xp-shop/buy", { method: "POST", body: JSON.stringify({ key: event.currentTarget.dataset.xpBuy }) });
+    state.profile = data.profile || state.profile;
+    showPixelResult({ title: "XP SHOP OK", lines: [`${data.item?.name || "상품"} 구매 완료`] });
+    renderProfile();
+    renderXpShop();
+  } catch (error) {
+    showPixelResult({ title: "XP SHOP FAIL", lines: [error.message], tone: "bad" });
+  }
+}
+
+async function loadXpShop() {
+  try {
+    state.xpShop = await api("/api/xp-shop");
+  } catch {
+    state.xpShop = { items: [] };
+  }
+  renderXpShop();
 }
 
 async function selectTitle(event) {
@@ -750,6 +797,7 @@ async function init() {
     state.shop = demoShop;
     state.demo = true;
   }
+  await loadXpShop();
   renderShop();
   renderGames();
   if (state.me) {

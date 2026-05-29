@@ -212,6 +212,12 @@ const titleItems = [
 const badgeItems = [
   ['first_step','첫 발자국','나츠미 게임 사이트 입문자.',50000,'🐾'],['tiny_coin','작은 동전','시작은 작지만 반짝임은 진짜.',60000,'🪙'],['daily_soul','출석혼','출석을 꽤 진심으로 하는 편.',75000,'📅'],['sparkle','반짝임','프로필에 가벼운 광채를 더함.',90000,'✨'],['fox_paw','여우 발바닥','도장처럼 찍히는 귀여운 흔적.',110000,'🐾'],['hot_streak','연승 불꽃','기세가 오를 때 어울리는 뱃지.',135000,'🔥'],['rank_spark','랭크 스파크','랭크 카드에 반짝임을 더함.',160000,'⚡'],['moon_mark','달빛 표식','새벽 접속자에게 어울리는 감성.',190000,'🌙'],['lucky_clover','행운 클로버','운빨도 실력이라고 우기는 사람용.',225000,'🍀'],['gold_pouch','황금 주머니','금전 보유자 느낌을 내는 뱃지.',265000,'👝'],['pink_heart','핑크 하트','귀여움으로 모든 걸 해결한다.',310000,'💗'],['blue_star','푸른 별','차분하지만 확실히 눈에 띈다.',360000,'🔷'],['crown_bit','작은 왕관','왕관은 작아도 자존심은 큼.',420000,'👑'],['diamond_chip','다이아 조각','비싼 척하기 좋은 반짝이.',490000,'💎'],['sword_mark','검의 문장','전투력 있어 보이고 싶은 날에.',570000,'🗡️'],['shield_mark','방패 문장','믿음직한 유저처럼 보이게 해줌.',660000,'🛡️'],['dragon_scale','용의 비늘','신화급 분위기를 살짝 얹는다.',770000,'🐉'],['galaxy_core','은하 코어','프로필을 우주급으로 꾸미는 장식.',900000,'🌌'],['supporter','서포터','후원자를 위한 표시용 뱃지.',1000000,'💖'],['legend_stamp','전설 인증','비싸지만 이름값은 하는 최상급 뱃지.',1250000,'🏅']
 ].map(([key,name,description,price,emoji]) => ({ key, name, description, price, emoji }));
+const xpShopItems = [
+  { key: 'daily_role_plus', name: '출석 역할 슬롯', description: '프리미엄 출석 역할 보상을 열 수 있는 이용권.', xpPrice: 2500, premium: true, emoji: '📅' },
+  { key: 'rank_card_frame_pink', name: '핑크 랭크카드 프레임', description: '랭크카드 테두리를 분홍빛으로 꾸미는 장식.', xpPrice: 3500, premium: true, emoji: '🎀' },
+  { key: 'rank_card_sparkle', name: '반짝 랭크카드 효과', description: '랭크카드에 은은한 반짝 효과를 추가하는 장식.', xpPrice: 4200, premium: true, emoji: '✨' },
+  { key: 'mini_xp_boost', name: '소형 경험치 부스터', description: '게임 보상 경험치를 소량 올리는 부스터.', xpPrice: 1800, premium: false, emoji: '⚡' },
+];
 
 async function seedShop() { await Promise.all(titleItems.map((item) => Title.updateOne({ key: item.key }, { $set: item }, { upsert: true }))); await Promise.all(badgeItems.map((item) => Badge.updateOne({ key: item.key }, { $set: item }, { upsert: true }))); }
 function toInt(value, fallback = 0) { const n = Number(value); return Number.isFinite(n) ? n : fallback; }
@@ -220,6 +226,10 @@ function pick(list) { return list[Math.floor(Math.random() * list.length)]; }
 function currentUserId(req) { return req.session?.discordUser?.id || req.body?.userId || req.params?.userId || ''; }
 async function ensureMoney(userId) { let data = await Money.findOne({ userid: userId }); if (!data) data = await Money.create({ userid: userId, money: 0, date: Date.now() }); return data; }
 async function addMoney(userId, delta) { await Money.updateOne({ userid: userId }, { $inc: { money: delta }, $set: { date: Date.now() } }, { upsert: true }); return ensureMoney(userId); }
+async function addXp(userId, delta, guildId = DEFAULT_GUILD_ID || 'global') {
+  await LevelSystem.updateOne({ GuildID: guildId, UserID: userId }, { $inc: { xp: delta } }, { upsert: true });
+  return LevelSystem.findOne({ GuildID: guildId, UserID: userId }).lean();
+}
 function getSupportTier(amount) { return [...supportTiers].reverse().find((tier) => amount >= tier.min) || null; }
 function supportRewards(tier) { return tier ? { title: `support_${tier.key}_title`, badge: `support_${tier.key}_badge`, money: tier.money } : {}; }
 async function grantSupportRewards(userId, tier) {
@@ -661,6 +671,27 @@ app.post('/api/dashboard/guilds/:guildId/questions/:id/answer', requireLogin, as
   res.json({ ok: true, question: row });
 });
 app.get('/api/shop', async (req, res) => { const [titles, badges] = await Promise.all([Title.find().sort({ price: 1 }).lean(), Badge.find().sort({ price: 1 }).lean()]); res.json({ titles, badges }); });
+app.get('/api/xp-shop', (_req, res) => res.json({ items: xpShopItems, premium: xpShopItems.filter((item) => item.premium) }));
+app.post('/api/xp-shop/buy', requireLogin, async (req, res) => {
+  const userId = req.session.discordUser.id;
+  const item = xpShopItems.find((entry) => entry.key === req.body?.key);
+  if (!item) return res.status(404).json({ error: '상품을 찾을 수 없어.' });
+  const profile = await getProfile(DEFAULT_GUILD_ID, userId);
+  if (profile.xp < item.xpPrice) return res.status(400).json({ error: '경험치가 부족해.', needed: item.xpPrice, xp: profile.xp });
+  const ownedField = item.premium ? 'badges' : 'titles';
+  const rewardKey = `xp_shop_${item.key}`;
+  const inv = await Inventory.findOne({ userId }).lean();
+  if ((inv?.[ownedField] || []).includes(rewardKey)) return res.status(409).json({ error: '이미 보유한 상품이야.' });
+  if (item.premium) {
+    await Badge.updateOne({ key: rewardKey }, { $set: { key: rewardKey, name: item.name, description: item.description, price: 0, emoji: item.emoji } }, { upsert: true });
+    await Inventory.updateOne({ userId }, { $addToSet: { badges: rewardKey } }, { upsert: true });
+  } else {
+    await Title.updateOne({ key: rewardKey }, { $set: { key: rewardKey, name: item.name, description: item.description, price: 0, emoji: item.emoji } }, { upsert: true });
+    await Inventory.updateOne({ userId }, { $addToSet: { titles: rewardKey }, $setOnInsert: { activeTitle: rewardKey } }, { upsert: true });
+  }
+  await addXp(userId, -item.xpPrice);
+  res.json({ ok: true, item, profile: await getProfile(DEFAULT_GUILD_ID, userId) });
+});
 app.get('/api/profile/me', async (req, res) => { if (!req.session?.discordUser?.id) return res.status(401).json({ error: 'Discord 로그인이 필요해.' }); res.json(await getProfile(DEFAULT_GUILD_ID, req.session.discordUser.id)); });
 app.get('/api/profile/:guildId/:userId', async (req, res) => res.json(await getProfile(req.params.guildId, req.params.userId)));
 app.get('/api/bag/me', async (req, res) => {
