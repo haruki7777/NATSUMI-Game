@@ -42,6 +42,7 @@ const gameDefs = {
   mine: { name: "비밀 광산", icon: "mine", desc: "광산 타일 하나를 직접 골라 보석을 캐는 게임.", api: "/api/games/mine" },
   mole: { name: "두더지 속도전", icon: "mole", desc: "8초 동안 튀어나오는 두더지를 최대한 빠르게 잡아요.", api: "/api/games/mole" },
   fishing: { name: "나츠미 낚시터", icon: "fish", desc: "찌가 초록 구간에 들어왔을 때 낚아 올려요.", api: "/api/games/fishing" },
+  ono: { name: "오노 카드 대결", icon: "card", desc: "나츠미와 5라운드 카드 승부. 이기면 금전, 지면 배팅금을 잃어요.", api: "/api/games/ono" },
   anime: { name: "애니굿즈 가챠", icon: "gacha", desc: "레버를 세 번 돌려 캡슐을 뽑는 웹 가챠.", api: "/api/games/anime-gacha" }
 };
 
@@ -275,7 +276,7 @@ function selectGame(key) {
   $("#gameTitle").textContent = game.name;
   $("#gameDesc").textContent = game.desc;
   $("#betInput").style.display = ["fishing", "anime", "mole"].includes(key) ? "none" : "block";
-  $("#playGameBtn").textContent = key === "slot" ? "코인 넣기" : key === "mole" ? "속도전 시작" : key === "anime" ? "가챠 시작" : "게임 입장";
+  $("#playGameBtn").textContent = key === "slot" ? "코인 넣기" : key === "mole" ? "속도전 시작" : key === "anime" ? "가챠 시작" : key === "ono" ? "오노 시작" : "게임 입장";
 }
 
 function renderGameStage(key, active = false) {
@@ -296,6 +297,16 @@ function renderGameStage(key, active = false) {
     stage.innerHTML = `<div class="mole-hud"><b id="moleTimer">8.0</b><span id="moleScore">0 HIT</span></div><div class="mole-grid">${Array.from({ length: 9 }, (_, i) => `<button class="mole-cell" data-mole="${i}" type="button"><span class="mole-dirt"></span><span class="mole-sprite"></span><span class="hit-pop">HIT!</span></button>`).join("")}</div><div class="arcade-help">두더지가 올라오는 구멍을 바로 눌러!</div>`;
   } else if (key === "anime") {
     stage.innerHTML = `<div class="gacha-machine">${pixelIcon("gacha")}<div class="capsule">CAPSULE</div><button id="gachaLever" class="gacha-lever" type="button">LEVER 0/3</button><div class="pixel-lightbar"></div><div class="arcade-help">레버를 세 번 돌려 캡슐을 열어!</div></div>`;
+  } else if (key === "ono") {
+    stage.innerHTML = `<div class="ono-table">
+      <div class="ono-score"><b id="onoRound">ROUND 1/5</b><span id="onoWins">0 WIN</span></div>
+      <div class="ono-battle">
+        <div class="ono-side"><small>PLAYER</small><button class="ono-card" data-ono-card="0" type="button">RED 7</button><button class="ono-card" data-ono-card="1" type="button">BLUE 4</button><button class="ono-card" data-ono-card="2" type="button">WILD</button></div>
+        <div class="ono-vs">VS</div>
+        <div class="ono-side"><small>NATSUMI</small><div class="ono-bot-card" id="onoBotCard">?</div></div>
+      </div>
+      <div class="arcade-help" id="onoHelp">카드를 하나 내면 나츠미가 받아쳐요. 5라운드 먼저 3승이면 정산!</div>
+    </div>`;
   } else {
     stage.innerHTML = `<div class="bun-machine">${pixelIcon("bun")}<div class="bun-window">HOT</div><div class="bun-tray">${Array.from({ length: 4 }, (_, i) => `<button class="bun-pick" data-bun="${i}" type="button">BUN</button>`).join("")}</div><div class="arcade-help">진열대에서 붕어빵 하나를 골라!</div></div>`;
   }
@@ -305,7 +316,7 @@ function setPlaying(playing) {
   if (!button) return;
   button.disabled = playing;
   if (playing) button.textContent = "플레이 중";
-  else button.textContent = state.game === "slot" ? "코인 넣기" : state.game === "mole" ? "속도전 시작" : state.game === "anime" ? "가챠 시작" : "게임 입장";
+  else button.textContent = state.game === "slot" ? "코인 넣기" : state.game === "mole" ? "속도전 시작" : state.game === "anime" ? "가챠 시작" : state.game === "ono" ? "오노 시작" : "게임 입장";
 }
 
 function demoProfile(guildId, userId) {
@@ -502,6 +513,7 @@ async function playGame() {
   if (key === "mine") return startMineGame();
   if (key === "fishbun") return startBunGame();
   if (key === "fishing") return startFishingGame();
+  if (key === "ono") return startOnoGame();
   if (key === "anime") return startGachaGame();
 }
 
@@ -634,6 +646,72 @@ function startGachaGame() {
       finishGame("/api/games/anime-gacha", { rollCount: 1 });
     }
   });
+}
+
+function startOnoGame() {
+  const bet = Number($("#betInput").value || 1000);
+  const cards = ["RED 7", "BLUE 4", "GREEN SKIP", "YELLOW 2", "WILD", "PINK +2", "FOX REVERSE"];
+  const playerButtons = [...document.querySelectorAll("[data-ono-card]")];
+  const botCard = $("#onoBotCard");
+  const roundLabel = $("#onoRound");
+  const winsLabel = $("#onoWins");
+  const help = $("#onoHelp");
+  let round = 1;
+  let playerWins = 0;
+  let botWins = 0;
+  let locked = false;
+
+  const drawHand = () => {
+    playerButtons.forEach((button) => {
+      button.textContent = cards[Math.floor(Math.random() * cards.length)];
+      button.disabled = false;
+    });
+    if (botCard) botCard.textContent = "?";
+    if (roundLabel) roundLabel.textContent = `ROUND ${round}/5`;
+    if (winsLabel) winsLabel.textContent = `${playerWins} WIN / ${botWins} LOSE`;
+    locked = false;
+  };
+
+  const finishOno = (finalRound, finalPlayerWins, finalBotWins) => {
+    finishGame("/api/games/ono", {
+      bet,
+      rounds: finalRound,
+      playerWins: finalPlayerWins,
+      botWins: finalBotWins,
+    });
+  };
+
+  playerButtons.forEach((button) => button.addEventListener("click", () => {
+    if (locked) return;
+    locked = true;
+    playerButtons.forEach((item) => { item.disabled = true; });
+    const playerCard = button.textContent;
+    const bot = cards[Math.floor(Math.random() * cards.length)];
+    const playerPower = Math.floor(30 + Math.random() * 70) + (playerCard.includes("WILD") ? 15 : 0);
+    const botPower = Math.floor(30 + Math.random() * 70) + (bot.includes("WILD") ? 15 : 0);
+    if (botCard) botCard.textContent = bot;
+    if (playerPower >= botPower) {
+      playerWins += 1;
+      button.classList.add("ono-win");
+      if (help) help.textContent = `이겼어! ${playerCard} (${playerPower}) > ${bot} (${botPower})`;
+    } else {
+      botWins += 1;
+      button.classList.add("ono-lose");
+      if (help) help.textContent = `졌어... ${playerCard} (${playerPower}) < ${bot} (${botPower})`;
+    }
+    if (winsLabel) winsLabel.textContent = `${playerWins} WIN / ${botWins} LOSE`;
+    if (playerWins >= 3 || botWins >= 3 || round >= 5) {
+      setTimeout(() => finishOno(round, playerWins, botWins), 650);
+      return;
+    }
+    round += 1;
+    setTimeout(() => {
+      playerButtons.forEach((item) => item.classList.remove("ono-win", "ono-lose"));
+      drawHand();
+    }, 900);
+  }));
+
+  drawHand();
 }
 
 function showGameResult(data) {

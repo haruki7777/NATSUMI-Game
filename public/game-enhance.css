@@ -154,5 +154,21 @@ body{background:#120719;color:var(--text);text-rendering:geometricPrecision}
 
 /* Mobile arcade tap stability */
 button,.bobber,.mole-cell,.mine-cell,.bun-pick,.reel,.gacha-lever,#playGameBtn{touch-action:manipulation;-webkit-tap-highlight-color:transparent;-webkit-user-select:none;user-select:none}
+
+.stage-ono{background:linear-gradient(180deg,rgba(255,154,213,.24),rgba(40,16,36,.82))}
+.ono-table{width:min(620px,100%);display:grid;gap:16px;padding:18px}
+.ono-score{display:flex;justify-content:space-between;gap:10px;align-items:center;color:var(--text);font-weight:1000}
+.ono-battle{display:grid;grid-template-columns:1fr auto 1fr;gap:14px;align-items:center}
+.ono-side{display:grid;gap:10px;text-align:center}
+.ono-side small{color:var(--muted);font-weight:1000}
+.ono-card,.ono-bot-card{min-height:82px;border:2px solid #2c1028;border-radius:18px;background:linear-gradient(180deg,#fff4c7,#ffd166);color:#2d1425;font-weight:1000;box-shadow:0 10px 0 rgba(0,0,0,.18);display:grid;place-items:center}
+.ono-card:nth-of-type(2){background:linear-gradient(180deg,#bde7ff,#5aa9ff)}
+.ono-card:nth-of-type(3){background:linear-gradient(180deg,#ffc1df,#ff5ba9)}
+.ono-card:disabled{opacity:.9}
+.ono-card.ono-win{outline:4px solid #74f5a4;transform:translateY(-4px)}
+.ono-card.ono-lose{outline:4px solid #ff6b6b;filter:saturate(.7)}
+.ono-bot-card{background:linear-gradient(180deg,#2d2345,#7d4acf);color:white}
+.ono-vs{font-size:clamp(24px,5vw,42px);font-weight:1000;color:#fff;text-shadow:3px 3px 0 #2c1028}
+@media(max-width:700px){.ono-battle{grid-template-columns:1fr}.ono-vs{font-size:24px}.ono-card,.ono-bot-card{min-height:64px}}
 .stage-fishing,.stage-mole,.mole-grid,.fishing-scene,.game-stage{touch-action:manipulation}
 @media(max-width:760px){.stage-fishing .bobber,.mole-cell,#catchFishBtn{touch-action:manipulation}.mole-grid{overscroll-behavior:contain}}
