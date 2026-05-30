@@ -1,0 +1,58 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="theme-color" content="#160d24" />
+  <title>여우별 PVP 아케이드 | NATSUMI Game</title>
+  <link rel="preload" href="./fonts/dalmoori.woff2" as="font" type="font/woff2" crossorigin />
+  <link rel="stylesheet" href="./style.css" />
+  <link rel="stylesheet" href="./game-enhance.css" />
+  <link rel="stylesheet" href="./fox-fantasy-pixel.css" />
+  <link rel="stylesheet" href="./pvp.css" />
+</head>
+<body class="pvp-page">
+  <main class="pvp-shell">
+    <header class="pvp-hero pixel-frame">
+      <a class="pvp-back" href="/">← 게임센터</a>
+      <div>
+        <p class="eyebrow">YUZUHA PVP WEB PORT</p>
+        <h1>여우별 PVP 아케이드</h1>
+        <p>유즈하 PVP 아케이드를 웹 게임으로 옮긴 첫 버전이야. 봇과 겨루거나, 나중에 실시간 대전으로 확장할 수 있게 게임별 엔진을 분리했어.</p>
+      </div>
+      <div id="pvpUser" class="pvp-user">로그인 확인 중...</div>
+    </header>
+
+    <section class="pvp-layout">
+      <aside class="pvp-menu pixel-frame">
+        <button class="pvp-game active" data-game="horse" type="button"><span>🏇</span><b>여우 경마</b><small>픽셀 트랙 질주</small></button>
+        <a class="pvp-game" href="/ono.html"><span>🃏</span><b>여우별 오노</b><small>전용 페이지</small></a>
+        <button class="pvp-game" data-game="roulette" type="button"><span>🎲</span><b>운명의 룬렛</b><small>위험한 운 시험</small></button>
+        <button class="pvp-game" data-game="blackjack" type="button"><span>🂡</span><b>달빛 블랙잭</b><small>21에 가까워져라</small></button>
+        <button class="pvp-game" data-game="mines" type="button"><span>💣</span><b>마석 지뢰찾기</b><small>안전한 칸 찾기</small></button>
+      </aside>
+
+      <section class="pvp-stage pixel-frame">
+        <div class="pvp-hud">
+          <span id="pvpGameName">여우 경마</span>
+          <span id="pvpMoney">금전 -</span>
+          <span id="pvpScore">PLAYER 0 : 0 NATSUMI</span>
+        </div>
+        <div id="pvpScene" class="pvp-scene"></div>
+        <div id="pvpMessage" class="pvp-message">게임을 고르고 시작해. 나츠미가 봇 상대로 먼저 놀아줄게.</div>
+        <div class="pvp-controls">
+          <label><span>BET</span><input id="pvpBet" type="number" min="100" step="100" value="1000" inputmode="numeric" /></label>
+          <button id="pvpStartBtn" type="button">대결 시작</button>
+          <button id="pvpRoundBtn" type="button" disabled>라운드 진행</button>
+          <button id="pvpResetBtn" type="button">초기화</button>
+        </div>
+        <div id="pvpChoices" class="pvp-choices"></div>
+        <div id="pvpLog" class="pvp-log"></div>
+      </section>
+    </section>
+  </main>
+
+  <script src="./config.js"></script>
+  <script src="./pvp.js"></script>
+</body>
+</html>
