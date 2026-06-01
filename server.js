@@ -30,6 +30,7 @@ const DEVELOPER_NOTICE_CHANNEL_ID = process.env.DEVELOPER_NOTICE_CHANNEL_ID || '
 const DONATION_NOTICE_CHANNEL_ID = process.env.DONATION_NOTICE_CHANNEL_ID || '1511013156263166065';
 const DONATION_VVIP_ROLE_ID = process.env.DONATION_VVIP_ROLE_ID || '1511014086824169562';
 const DONATION_MVP_ROLE_ID = process.env.DONATION_MVP_ROLE_ID || '1511014141760901212';
+const KOFI_VERIFICATION_TOKEN = process.env.KOFI_VERIFICATION_TOKEN || '';
 const DISCORD_ADMINISTRATOR = 0x8n;
 const DISCORD_MANAGE_GUILD = 0x20n;
 const calculateXP = (level) => level * level * 100;
@@ -77,6 +78,7 @@ async function sendOwnerSupportDm(row, tier) {
 }
 
 app.use(express.json());
+app.use(express.urlencoded({ extended: false }));
 app.use((req, res, next) => {
   const forceHttps = String(process.env.FORCE_HTTPS || '').toLowerCase() === 'true';
   const forwardedProto = req.headers['x-forwarded-proto'];
@@ -822,6 +824,32 @@ app.post('/api/support/apply', async (req, res) => {
     donationAccount: DONATION_ACCOUNT,
     donationBankAccount: DONATION_BANK_ACCOUNT,
   });
+});
+app.post('/api/kofi/webhook', async (req, res) => {
+  const raw = req.body?.data ? req.body.data : req.body;
+  let payload = raw;
+  if (typeof raw === 'string') {
+    try { payload = JSON.parse(raw); } catch { payload = {}; }
+  }
+  if (KOFI_VERIFICATION_TOKEN && payload?.verification_token !== KOFI_VERIFICATION_TOKEN) {
+    return res.status(403).json({ error: 'invalid verification token' });
+  }
+  const amount = Math.max(0, Math.floor(Number(payload?.amount || payload?.amount_received || 0)));
+  const tier = getSupportTier(amount);
+  if (!tier) return res.json({ ok: true, ignored: true, reason: 'below tier minimum' });
+  const row = await SupportRequest.create({
+    userId: 'guest',
+    username: payload?.from_name || payload?.email || '',
+    name: payload?.from_name || 'Ko-fi supporter',
+    amount,
+    memo: payload?.message || payload?.kofi_transaction_id || '',
+    tierKey: tier.key,
+    tierName: tier.name,
+    rewards: supportRewards(tier),
+  });
+  await sendDonationChannelNotice(row, tier, 'pending');
+  await sendOwnerSupportDm(row, tier);
+  res.json({ ok: true, id: row._id, status: row.status });
 });
 app.get('/api/support/requests', async (req, res) => {
   if (!OWNER_USER_ID || req.session?.discordUser?.id !== OWNER_USER_ID) return res.status(403).json({ error: '운영자만 확인할 수 있어.' });
