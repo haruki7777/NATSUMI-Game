@@ -33,6 +33,7 @@
         <button data-view="games" class="nav-btn" type="button">게임센터</button>
         <button data-view="inventory" class="nav-btn" type="button">가방/도감</button>
         <button data-view="shop" class="nav-btn" type="button">상점</button>
+        <button data-view="market" class="nav-btn" type="button">&#54028;&#51068;&#49345;&#51216;</button>
         <button data-view="xpShop" class="nav-btn" type="button">경험치 상점</button>
         <button data-view="premium" class="nav-btn" type="button">프리미엄</button>
         <button data-view="support" class="nav-btn" type="button">후원</button>
@@ -121,6 +122,29 @@
         <button class="tab" data-tab="badges" type="button">배지</button>
       </div>
       <div id="shopArea" class="cards"></div>
+    </section>
+
+    <section id="marketView" class="view">
+      <div class="section-head">
+        <p class="eyebrow">USER MARKET</p>
+        <h2>&#54028;&#51068; &#50629;&#47196;&#46300; &#49345;&#51216;</h2>
+      </div>
+      <form id="marketForm" class="market-form support-card">
+        <input id="marketName" type="text" maxlength="80" placeholder="&#49345;&#54408; &#51060;&#47492;" required />
+        <textarea id="marketDesc" maxlength="300" placeholder="&#49345;&#54408; &#49444;&#47749;"></textarea>
+        <div class="market-row">
+          <input id="marketPrice" type="number" min="100" max="10000000" value="1000" inputmode="numeric" aria-label="&#44032;&#44201;" />
+          <input id="marketQuantity" type="number" min="1" max="100" value="1" inputmode="numeric" aria-label="&#49688;&#47049;" />
+        </div>
+        <input id="marketFile" type="file" required />
+        <button type="submit">&#54028;&#51068; &#49345;&#54408; &#50732;&#47532;&#44592;</button>
+        <p class="market-note">1.5MB &#51060;&#54616; &#54028;&#51068;&#47564; &#50732;&#47540; &#49688; &#51080;&#44256;, &#49688;&#47049;&#51060; &#47784;&#46160; &#54036;&#47532;&#47732; &#51088;&#46041;&#51004;&#47196; &#45803;&#54784;&#50836;.</p>
+      </form>
+      <div class="shop-tabs">
+        <button class="tab active" id="marketAllBtn" type="button">&#54032;&#47588;&#51473;</button>
+        <button class="tab" id="marketMineBtn" type="button">&#45236; &#49345;&#54408;</button>
+      </div>
+      <div id="marketArea" class="cards">&#54028;&#51068; &#49345;&#51216;&#51012; &#48520;&#47084;&#50724;&#45716; &#51473;...</div>
     </section>
 
     <section id="xpShopView" class="view">

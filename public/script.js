@@ -8,6 +8,8 @@ let state = {
   me: null,
   game: "slot",
   bag: null,
+  market: null,
+  marketMode: "all",
   xpShop: null,
   mole: null,
   session: null
@@ -184,6 +186,7 @@ function showView(name) {
   $(`#${name}View`)?.classList.add("active-view");
   document.querySelectorAll(".nav-btn").forEach((button) => button.classList.toggle("active", button.dataset.view === name));
   if (name === "inventory") loadBag();
+  if (name === "market") loadMarket();
   if (name === "xpShop" || name === "premium") loadXpShop();
   window.scrollTo({ top: 0, behavior: "smooth" });
 }
@@ -230,8 +233,93 @@ function itemCard(item, type) {
 function renderShop() {
   if (!state.shop) return;
   const list = state.tab === "titles" ? state.shop.titles : state.shop.badges;
-  $("#shopArea").innerHTML = list.map((item) => itemCard(item, state.tab === "titles" ? "title" : "badge")).join("");
+  const price = state.shop.priceState;
+  const banner = price ? `<div class="market-banner">가격 변동 ${price.multiplier}x · 다음 변동 ${new Date(price.nextChangeAt).toLocaleString("ko-KR")}</div>` : "";
+  $("#shopArea").innerHTML = banner + list.map((item) => itemCard(item, state.tab === "titles" ? "title" : "badge")).join("");
   document.querySelectorAll("[data-buy]").forEach((button) => button.addEventListener("click", buyItem));
+}
+
+function marketCard(item) {
+  return `<article class="item pixel-shop-item">
+    <div class="shop-vending-window">${pixelIcon("gem")}<span class="emoji">FILE</span></div>
+    <h3>${item.name}</h3>
+    <small>${item.description || item.fileName || "사용자 업로드 파일"}</small>
+    <p><b>${fmt(item.price)}</b> 금전 · ${fmt(item.remaining)}개 남음</p>
+    <p class="market-note">판매자 ${item.sellerName || String(item.sellerId || "").slice(-6)}</p>
+    ${item.mine ? `<button data-market-close="${item.id}" type="button" ${item.status !== "active" ? "disabled" : ""}>판매 닫기</button>` : `<button data-market-buy="${item.id}" type="button">구매하기</button>`}
+  </article>`;
+}
+
+async function loadMarket(mode = state.marketMode) {
+  state.marketMode = mode;
+  const area = $("#marketArea");
+  if (!area) return;
+  area.textContent = "파일 상점을 불러오는 중...";
+  try {
+    const data = await api(`/api/market/listings${mode === "mine" ? "?mine=1" : ""}`);
+    state.market = data.listings || [];
+    area.innerHTML = state.market.length ? state.market.map(marketCard).join("") : "아직 올라온 파일 상품이 없어.";
+    document.querySelectorAll("[data-market-buy]").forEach((button) => button.addEventListener("click", buyMarketItem));
+    document.querySelectorAll("[data-market-close]").forEach((button) => button.addEventListener("click", closeMarketItem));
+  } catch (error) {
+    area.textContent = error.message || "파일 상점을 불러오지 못했어.";
+  }
+}
+
+function readFileAsDataUrl(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onerror = () => reject(new Error("파일을 읽지 못했어."));
+    reader.onload = () => resolve(reader.result);
+    reader.readAsDataURL(file);
+  });
+}
+
+async function createMarketListing(event) {
+  event.preventDefault();
+  if (!requireLogin()) return;
+  const file = $("#marketFile")?.files?.[0];
+  if (!file) return alert("판매할 파일을 골라줘.");
+  if (file.size > 1_500_000) return alert("파일이 너무 커. 1.5MB 이하로 줄여줘.");
+  const fileData = await readFileAsDataUrl(file);
+  const body = {
+    name: $("#marketName").value,
+    description: $("#marketDesc").value,
+    price: Number($("#marketPrice").value || 1000),
+    quantity: Number($("#marketQuantity").value || 1),
+    fileName: file.name,
+    fileType: file.type || "application/octet-stream",
+    fileData,
+  };
+  const data = await api("/api/market/listings", { method: "POST", body: JSON.stringify(body) });
+  alert(data.message || "등록 완료");
+  event.currentTarget.reset();
+  await loadMarket("mine");
+}
+
+function downloadDataUrl(fileName, dataUrl) {
+  const a = document.createElement("a");
+  a.href = dataUrl;
+  a.download = fileName || "natsumi-market-file";
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+}
+
+async function buyMarketItem(event) {
+  if (!requireLogin()) return;
+  const id = event.currentTarget.dataset.marketBuy;
+  const data = await api(`/api/market/listings/${id}/buy`, { method: "POST", body: "{}" });
+  alert(data.message || "구매 완료");
+  if (data.fileData) downloadDataUrl(data.fileName, data.fileData);
+  await Promise.all([loadProfile(), loadMarket()]);
+}
+
+async function closeMarketItem(event) {
+  const id = event.currentTarget.dataset.marketClose;
+  const data = await api(`/api/market/listings/${id}/close`, { method: "POST", body: "{}" });
+  alert(data.message || "판매를 닫았어.");
+  await loadMarket("mine");
 }
 
 function xpShopCard(item) {
@@ -855,6 +943,17 @@ function bindUiEvents() {
     state.arcadeTab = button.dataset.arcadeTab;
     renderBag();
   }));
+  $("#marketForm")?.addEventListener("submit", createMarketListing);
+  $("#marketAllBtn")?.addEventListener("click", () => {
+    $("#marketAllBtn").classList.add("active");
+    $("#marketMineBtn").classList.remove("active");
+    loadMarket("all");
+  });
+  $("#marketMineBtn")?.addEventListener("click", () => {
+    $("#marketMineBtn").classList.add("active");
+    $("#marketAllBtn").classList.remove("active");
+    loadMarket("mine");
+  });
 }
 
 async function init() {

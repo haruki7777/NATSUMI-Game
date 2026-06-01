@@ -77,8 +77,8 @@ async function sendOwnerSupportDm(row, tier) {
   }
 }
 
-app.use(express.json());
-app.use(express.urlencoded({ extended: false }));
+app.use(express.json({ limit: process.env.MARKET_UPLOAD_LIMIT || '2mb' }));
+app.use(express.urlencoded({ extended: false, limit: process.env.MARKET_UPLOAD_LIMIT || '2mb' }));
 app.use((req, res, next) => {
   const forceHttps = String(process.env.FORCE_HTTPS || '').toLowerCase() === 'true';
   const forwardedProto = req.headers['x-forwarded-proto'];
@@ -195,6 +195,38 @@ const Collection = model('Collection', new Schema({
   animeItems: { type: [String], default: [] },
   fishingItems: { type: [String], default: [] }
 }));
+const TaxLog = model('GameTaxLog', new Schema({
+  runKey: { type: String, unique: true, index: true },
+  percent: Number,
+  totalCollected: { type: Number, default: 0 },
+  affectedUsers: { type: Number, default: 0 },
+  createdAt: { type: Date, default: Date.now },
+}));
+const MarketListing = model('GameMarketListing', new Schema({
+  sellerId: { type: String, required: true, index: true },
+  sellerName: String,
+  name: { type: String, required: true },
+  description: String,
+  price: { type: Number, required: true },
+  quantity: { type: Number, default: 1 },
+  sold: { type: Number, default: 0 },
+  status: { type: String, default: 'active', index: true },
+  fileName: String,
+  fileType: String,
+  fileData: String,
+  createdAt: { type: Date, default: Date.now },
+  closedAt: Date,
+}));
+const MarketPurchase = model('GameMarketPurchase', new Schema({
+  listingId: { type: Schema.Types.ObjectId, index: true },
+  buyerId: { type: String, index: true },
+  sellerId: { type: String, index: true },
+  price: Number,
+  fileName: String,
+  fileType: String,
+  fileData: String,
+  createdAt: { type: Date, default: Date.now },
+}));
 
 const animeGoods = {
   GOLDEN: ['황금 여우 피규어', '전설의 마법봉', '한정판 별빛 망토', '프리미엄 나츠미 포스터'],
@@ -231,6 +263,53 @@ function pick(list) { return list[Math.floor(Math.random() * list.length)]; }
 function currentUserId(req) { return req.session?.discordUser?.id || req.body?.userId || req.params?.userId || ''; }
 async function ensureMoney(userId) { let data = await Money.findOne({ userid: userId }); if (!data) data = await Money.create({ userid: userId, money: 0, date: Date.now() }); return data; }
 async function addMoney(userId, delta) { await Money.updateOne({ userid: userId }, { $inc: { money: delta }, $set: { date: Date.now() } }, { upsert: true }); return ensureMoney(userId); }
+function priceState(now = Date.now()) {
+  const hours = Math.max(1, Number(process.env.PRICE_CYCLE_HOURS || 6));
+  const seed = Math.floor(now / (hours * 60 * 60 * 1000));
+  const wave = Math.sin(seed * 12.9898) * 43758.5453;
+  const random = wave - Math.floor(wave);
+  const min = Math.max(0.5, Number(process.env.PRICE_MULTIPLIER_MIN || 0.85));
+  const max = Math.min(2, Number(process.env.PRICE_MULTIPLIER_MAX || 1.2));
+  const multiplier = Math.round((min + (max - min) * random) * 100) / 100;
+  const nextChangeAt = new Date((seed + 1) * hours * 60 * 60 * 1000);
+  return { multiplier, cycleHours: hours, nextChangeAt };
+}
+function withDynamicPrice(item) {
+  const state = priceState();
+  return {
+    ...item,
+    basePrice: toInt(item.price, 0),
+    price: Math.max(1, Math.floor(toInt(item.price, 0) * state.multiplier)),
+    priceMultiplier: state.multiplier,
+    nextPriceChangeAt: state.nextChangeAt,
+  };
+}
+async function collectGameTax({ force = false } = {}) {
+  if (String(process.env.GAME_TAX_ENABLED || 'true').toLowerCase() === 'false' && !force) return null;
+  const intervalHours = Math.max(1, Number(process.env.GAME_TAX_INTERVAL_HOURS || 6));
+  const percent = Math.max(0, Math.min(25, Number(process.env.GAME_TAX_PERCENT || 2)));
+  if (percent <= 0) return null;
+  const runKey = `${Math.floor(Date.now() / (intervalHours * 60 * 60 * 1000))}`;
+  const existing = await TaxLog.findOne({ runKey }).lean().catch(() => null);
+  if (existing && !force) return existing;
+  const rows = await Money.find({ money: { $gt: Number(process.env.GAME_TAX_EXEMPT_UNDER || 1000) } }).lean();
+  let totalCollected = 0;
+  let affectedUsers = 0;
+  for (const row of rows) {
+    const balance = toInt(row.money, 0);
+    const raw = Math.floor(balance * (percent / 100));
+    const tax = Math.max(0, Math.min(raw, Number(process.env.GAME_TAX_MAX || 100000)));
+    if (tax <= 0) continue;
+    await addMoney(row.userid, -tax);
+    totalCollected += tax;
+    affectedUsers += 1;
+  }
+  return TaxLog.findOneAndUpdate(
+    { runKey },
+    { $set: { runKey, percent, totalCollected, affectedUsers, createdAt: new Date() } },
+    { upsert: true, new: true, setDefaultsOnInsert: true },
+  );
+}
 async function addXp(userId, delta, guildId = DEFAULT_GUILD_ID || 'global') {
   await LevelSystem.updateOne({ GuildID: guildId, UserID: userId }, { $inc: { xp: delta } }, { upsert: true });
   return LevelSystem.findOne({ GuildID: guildId, UserID: userId }).lean();
@@ -720,7 +799,40 @@ app.post('/api/dashboard/guilds/:guildId/questions/:id/answer', requireLogin, as
   ).lean();
   res.json({ ok: true, question: row });
 });
-app.get('/api/shop', async (req, res) => { const [titles, badges] = await Promise.all([Title.find().sort({ price: 1 }).lean(), Badge.find().sort({ price: 1 }).lean()]); res.json({ titles, badges }); });
+app.get('/api/shop', async (req, res) => {
+  const [titles, badges] = await Promise.all([
+    Title.find().sort({ price: 1 }).lean(),
+    Badge.find().sort({ price: 1 }).lean(),
+  ]);
+  res.json({ titles: titles.map(withDynamicPrice), badges: badges.map(withDynamicPrice), priceState: priceState() });
+});
+app.get('/api/price-state', (req, res) => res.json(priceState()));
+app.post('/api/buy', async (req, res, next) => {
+  try {
+    const userId = currentUserId(req);
+    const { itemType, key } = req.body;
+    if (!userId || !['title', 'badge'].includes(itemType) || !key) return res.status(400).json({ error: '로그인 또는 userId, itemType, key가 필요해.' });
+    const Item = itemType === 'title' ? Title : Badge;
+    const rawItem = await Item.findOne({ key }).lean();
+    if (!rawItem) return res.status(404).json({ error: '상점 아이템을 찾지 못했어.' });
+    const item = withDynamicPrice(rawItem);
+    const moneyData = await ensureMoney(userId);
+    const currentMoney = toInt(moneyData.money, 0);
+    if (currentMoney < item.price) return res.status(400).json({ error: `금전 부족! 필요 ${item.price}, 보유 ${currentMoney}` });
+    const field = itemType === 'title' ? 'titles' : 'badges';
+    const inv = await Inventory.findOne({ userId });
+    if (inv?.[field]?.includes(key)) return res.status(400).json({ error: '이미 가지고 있는 아이템이야.' });
+    await addMoney(userId, -item.price);
+    await Inventory.updateOne(
+      { userId },
+      { $addToSet: { [field]: key }, ...(itemType === 'title' ? { $setOnInsert: { activeTitle: key } } : {}) },
+      { upsert: true },
+    );
+    return res.json({ ok: true, message: `${item.emoji} ${item.name} 구매 완료! 현재 가격 배율 ${item.priceMultiplier}x`, price: item.price });
+  } catch (error) {
+    return next(error);
+  }
+});
 app.get('/api/xp-shop', (_req, res) => res.json({ items: xpShopItems, premium: xpShopItems.filter((item) => item.premium) }));
 app.post('/api/xp-shop/buy', requireLogin, async (req, res) => {
   const userId = req.session.discordUser.id;
@@ -785,8 +897,69 @@ app.get(['/terms', '/privacy', '/refund', '/data-policy'], (req, res) => {
   const [title, body] = pages[req.path] || pages['/terms'];
   res.type('html').send(`<!doctype html><html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><link rel="stylesheet" href="/style.css"><link rel="stylesheet" href="/game-enhance.css"><title>NATSUMI ${escapeHtml(title)}</title></head><body><main class="layout"><section class="view active-view policy-view"><p class="eyebrow">NATSUMI POLICY</p><h1>${escapeHtml(title)}</h1>${body.map((line) => `<p>${escapeHtml(line)}</p>`).join('')}<p><a class="primary-link" href="/">게임센터로 돌아가기</a> <a class="primary-link" href="${DASHBOARD_URL}">대시보드 바로가기</a></p></section></main></body></html>`);
 });
-app.post('/api/buy', async (req, res) => { const userId = currentUserId(req); const { itemType, key } = req.body; if (!userId || !['title', 'badge'].includes(itemType) || !key) return res.status(400).json({ error: '로그인 또는 userId, itemType, key가 필요해.' }); const Item = itemType === 'title' ? Title : Badge; const item = await Item.findOne({ key }).lean(); if (!item) return res.status(404).json({ error: '상점 아이템을 찾지 못했어.' }); const moneyData = await ensureMoney(userId); const currentMoney = toInt(moneyData.money, 0); if (currentMoney < item.price) return res.status(400).json({ error: `금전 부족! 필요 ${item.price}, 보유 ${currentMoney}` }); const field = itemType === 'title' ? 'titles' : 'badges'; const inv = await Inventory.findOne({ userId }); if (inv?.[field]?.includes(key)) return res.status(400).json({ error: '이미 가지고 있는 아이템이야.' }); await addMoney(userId, -item.price); await Inventory.updateOne({ userId }, { $addToSet: { [field]: key }, ...(itemType === 'title' ? { $setOnInsert: { activeTitle: key } } : {}) }, { upsert: true }); res.json({ ok: true, message: `${item.emoji} ${item.name} 구매 완료!` }); });
 app.post('/api/title/select', async (req, res) => { const userId = currentUserId(req); const { key } = req.body; const inv = await Inventory.findOne({ userId }); if (!inv?.titles?.includes(key)) return res.status(400).json({ error: '보유하지 않은 칭호야.' }); await Inventory.updateOne({ userId }, { $set: { activeTitle: key } }); res.json({ ok: true }); });
+app.get('/api/market/listings', async (req, res) => {
+  const userId = currentUserId(req);
+  const mine = req.query.mine === '1' || req.query.mine === 'true';
+  const query = mine && userId ? { sellerId: userId } : { status: 'active', $expr: { $lt: ['$sold', '$quantity'] } };
+  const rows = await MarketListing.find(query).sort({ createdAt: -1 }).limit(60).lean();
+  res.json({ listings: rows.map((row) => ({ id: row._id, sellerId: row.sellerId, sellerName: row.sellerName, name: row.name, description: row.description, price: row.price, quantity: row.quantity, sold: row.sold, remaining: Math.max(0, toInt(row.quantity, 0) - toInt(row.sold, 0)), status: row.status, fileName: row.fileName, fileType: row.fileType, createdAt: row.createdAt, mine: userId && row.sellerId === userId })) });
+});
+app.post('/api/market/listings', async (req, res) => {
+  const userId = currentUserId(req);
+  if (!userId) return res.status(401).json({ error: 'Discord 로그인이 필요해.' });
+  const name = String(req.body?.name || '').trim().slice(0, 80);
+  const description = String(req.body?.description || '').trim().slice(0, 300);
+  const fileName = String(req.body?.fileName || '').trim().slice(0, 120);
+  const fileType = String(req.body?.fileType || 'application/octet-stream').trim().slice(0, 80);
+  const fileData = String(req.body?.fileData || '');
+  const price = Math.max(100, Math.min(10_000_000, Math.floor(toInt(req.body?.price, 0))));
+  const quantity = Math.max(1, Math.min(100, Math.floor(toInt(req.body?.quantity, 1))));
+  if (!name) return res.status(400).json({ error: '상품 이름을 입력해줘.' });
+  if (!fileName || !fileData.startsWith('data:')) return res.status(400).json({ error: '판매할 파일을 업로드해줘.' });
+  if (fileData.length > Number(process.env.MARKET_FILE_DATA_MAX || 1_500_000)) return res.status(400).json({ error: '파일이 너무 커. 1.5MB 이하로 줄여줘.' });
+  const listing = await MarketListing.create({ sellerId: userId, sellerName: req.session?.discordUser?.globalName || req.session?.discordUser?.username || `USER-${String(userId).slice(-4)}`, name, description, price, quantity, fileName, fileType, fileData });
+  res.json({ ok: true, listingId: listing._id, message: '파일 상품이 게임센터 상점에 올라갔어.' });
+});
+app.post('/api/market/listings/:id/buy', async (req, res) => {
+  const userId = currentUserId(req);
+  if (!userId) return res.status(401).json({ error: 'Discord 로그인이 필요해.' });
+  const listing = await MarketListing.findById(req.params.id);
+  if (!listing || listing.status !== 'active') return res.status(404).json({ error: '판매 중인 상품을 찾지 못했어.' });
+  if (listing.sellerId === userId) return res.status(400).json({ error: '자기 상품은 구매할 수 없어.' });
+  if (toInt(listing.sold, 0) >= toInt(listing.quantity, 0)) {
+    listing.status = 'soldout';
+    listing.closedAt = new Date();
+    await listing.save();
+    return res.status(400).json({ error: '이미 품절된 상품이야.' });
+  }
+  const money = await ensureMoney(userId);
+  if (toInt(money.money, 0) < listing.price) return res.status(400).json({ error: '금전이 부족해.' });
+  const feePercent = Math.max(0, Math.min(50, Number(process.env.MARKET_FEE_PERCENT || 10)));
+  const sellerGain = Math.floor(listing.price * (1 - feePercent / 100));
+  await addMoney(userId, -listing.price);
+  await addMoney(listing.sellerId, sellerGain);
+  listing.sold += 1;
+  if (listing.sold >= listing.quantity) {
+    listing.status = 'soldout';
+    listing.closedAt = new Date();
+  }
+  await listing.save();
+  await MarketPurchase.create({ listingId: listing._id, buyerId: userId, sellerId: listing.sellerId, price: listing.price, fileName: listing.fileName, fileType: listing.fileType, fileData: listing.fileData });
+  const after = await ensureMoney(userId);
+  res.json({ ok: true, message: `${listing.name} 구매 완료!`, money: toInt(after.money, 0), fileName: listing.fileName, fileType: listing.fileType, fileData: listing.fileData });
+});
+app.post('/api/market/listings/:id/close', async (req, res) => {
+  const userId = currentUserId(req);
+  if (!userId) return res.status(401).json({ error: 'Discord 로그인이 필요해.' });
+  const listing = await MarketListing.findById(req.params.id);
+  if (!listing) return res.status(404).json({ error: '상품을 찾지 못했어.' });
+  if (listing.sellerId !== userId) return res.status(403).json({ error: '판매자만 닫을 수 있어.' });
+  listing.status = 'closed';
+  listing.closedAt = new Date();
+  await listing.save();
+  res.json({ ok: true, message: '상품 판매를 닫았어.' });
+});
 app.post('/api/support/apply', async (req, res) => {
   const userId = currentUserId(req) || 'guest';
   const name = String(req.body?.name || '').trim().slice(0, 80);
@@ -909,6 +1082,21 @@ app.post('/api/games/ono', async (req, res) => {
     money: toInt(after.money, 0),
   });
 });
+app.get('/api/tax/status', async (req, res) => {
+  const last = await TaxLog.findOne().sort({ createdAt: -1 }).lean().catch(() => null);
+  res.json({ last, config: { enabled: String(process.env.GAME_TAX_ENABLED || 'true') !== 'false', intervalHours: Number(process.env.GAME_TAX_INTERVAL_HOURS || 6), percent: Number(process.env.GAME_TAX_PERCENT || 2), max: Number(process.env.GAME_TAX_MAX || 100000) } });
+});
+app.post('/api/tax/collect', async (req, res) => {
+  if (!OWNER_USER_ID || req.session?.discordUser?.id !== OWNER_USER_ID) return res.status(403).json({ error: '운영자만 세금 정산을 실행할 수 있어.' });
+  const log = await collectGameTax({ force: true });
+  res.json({ ok: true, log });
+});
 app.get('/rank-card/:guildId/:userId', async (req, res) => { const p = await getProfile(req.params.guildId, req.params.userId); const active = p.ownedTitles.find((t) => t.key === p.activeTitle); const badges = p.ownedBadges.slice(0, 8).map((b) => `${b.emoji} ${b.name}`).join(' · '); const displayName = escapeHtml(req.query.name || req.query.username || p.displayName || `NATSUMI-${String(p.userId).slice(-4)}`); const title = escapeHtml(active ? `${active.emoji} ${active.name}` : '🦊 NATSUMI PLAYER'); const badgeText = escapeHtml(badges || '뱃지 없음'); res.type('html').send(`<!doctype html><html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><link rel="stylesheet" href="/style.css"><link rel="stylesheet" href="/game-enhance.css"><title>NATSUMI Rank Card</title></head><body class="card-only"><section class="rank-card web-rank-card"><div class="rank-glow"></div><div class="pixel-rank-grid"></div><div><p class="eyebrow">${title}</p><h1>${displayName}</h1><p>${badgeText} · 출석 ${p.attendance}회 · ${p.money.toLocaleString()} 금전</p></div><div class="level-badge">Lv.${p.level}</div><div class="stats"><div class="stat"><span>XP</span><b>${p.xp.toLocaleString()} / ${p.needed.toLocaleString()}</b></div><div class="stat"><span>ID</span><b>${escapeHtml(String(p.userId).slice(-6))}</b></div></div><div class="progress"><span style="width:${p.progress}%"></span></div><p>진행률 ${p.progress}%</p></section></body></html>`); });
 app.use((err, req, res, next) => { console.error(err); res.status(500).json({ error: '서버에서 문제가 생겼어.' }); });
-mongoose.connect(process.env.MONGO_URI).then(async () => { await seedShop(); app.listen(PORT, () => console.log(`NATSUMI Game running on ${PORT}`)); }).catch((err) => { console.error('MongoDB connection failed:', err.message); process.exit(1); });
+mongoose.connect(process.env.MONGO_URI).then(async () => {
+  await seedShop();
+  await collectGameTax().catch((error) => console.warn('tax skipped:', error.message));
+  const taxMs = Math.max(1, Number(process.env.GAME_TAX_INTERVAL_HOURS || 6)) * 60 * 60 * 1000;
+  setInterval(() => collectGameTax().catch((error) => console.warn('tax skipped:', error.message)), taxMs).unref?.();
+  app.listen(PORT, () => console.log(`NATSUMI Game running on ${PORT}`));
+}).catch((err) => { console.error('MongoDB connection failed:', err.message); process.exit(1); });

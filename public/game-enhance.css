@@ -172,3 +172,63 @@ button,.bobber,.mole-cell,.mine-cell,.bun-pick,.reel,.gacha-lever,#playGameBtn{t
 @media(max-width:700px){.ono-battle{grid-template-columns:1fr}.ono-vs{font-size:24px}.ono-card,.ono-bot-card{min-height:64px}}
 .stage-fishing,.stage-mole,.mole-grid,.fishing-scene,.game-stage{touch-action:manipulation}
 @media(max-width:760px){.stage-fishing .bobber,.mole-cell,#catchFishBtn{touch-action:manipulation}.mole-grid{overscroll-behavior:contain}}
+
+/* Player file market */
+.market-banner{
+  grid-column:1/-1;
+  border:3px dashed rgba(255,183,77,.72);
+  border-radius:18px;
+  padding:12px 14px;
+  background:linear-gradient(135deg,rgba(255,122,182,.18),rgba(255,183,77,.16));
+  color:var(--text);
+  font-weight:1000;
+}
+.market-form{
+  display:grid;
+  gap:12px;
+  margin-bottom:18px;
+}
+.market-form input,
+.market-form textarea{
+  width:100%;
+  border:2px solid rgba(255,172,205,.42);
+  border-radius:16px;
+  background:rgba(19,10,22,.78);
+  color:var(--text);
+  padding:13px 14px;
+  font:inherit;
+  font-weight:800;
+}
+.market-form textarea{
+  min-height:92px;
+  resize:vertical;
+}
+.market-form input::file-selector-button{
+  border:0;
+  border-radius:12px;
+  margin-right:10px;
+  padding:10px 12px;
+  background:linear-gradient(135deg,#f83b91,#ff9448);
+  color:#fff;
+  font-weight:1000;
+  cursor:pointer;
+}
+.market-row{
+  display:grid;
+  grid-template-columns:1fr 1fr;
+  gap:10px;
+}
+.market-note{
+  color:var(--muted);
+  font-size:14px;
+  font-weight:900;
+  margin:0;
+}
+:root[data-theme="light"] .market-form input,
+:root[data-theme="light"] .market-form textarea{
+  background:rgba(255,255,255,.82);
+  color:#28101d;
+}
+@media(max-width:640px){
+  .market-row{grid-template-columns:1fr}
+}
