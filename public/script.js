@@ -10,6 +10,7 @@ let state = {
   bag: null,
   market: null,
   marketMode: "all",
+  verification: null,
   xpShop: null,
   mole: null,
   session: null
@@ -133,7 +134,7 @@ function getInv(userId) {
 async function api(url, options = {}) {
   const res = await fetch(`${state.config.apiBase}${url}`, {
     credentials: "include",
-    headers: { "content-type": "application/json", ...(options.headers || {}) },
+    headers: { "content-type": "application/json", "x-natsumi-bot": "natsumi", ...(options.headers || {}) },
     ...options
   });
   const text = await res.text();
@@ -158,6 +159,75 @@ function requireLogin() {
   if (state.me) return true;
   goLogin();
   return false;
+}
+
+async function loadVerificationStatus() {
+  if (!state.me) {
+    state.verification = null;
+    renderVerification();
+    return;
+  }
+  try {
+    state.verification = await api("/api/verification/status");
+  } catch {
+    state.verification = null;
+  }
+  renderVerification();
+}
+
+function renderVerification(message = "") {
+  const box = $("#verifyArea");
+  if (!box) return;
+  if (!state.me) {
+    box.innerHTML = `<h3>웹 인증</h3><p class="market-note">Discord 로그인 후 이메일 인증을 완료하면 게임, 상점, 파일상점, 후원 기능을 사용할 수 있어요.</p>`;
+    return;
+  }
+  const natsumi = state.verification?.bots?.natsumi || {};
+  const yuzuha = state.verification?.bots?.yuzuha || {};
+  box.innerHTML = `
+    <h3>웹 인증</h3>
+    <p class="market-note">나츠미와 유즈하는 인증을 따로 저장해요. 게임센터 기본 기능은 나츠미 인증이 필요하고, PVP는 유즈하 인증이 필요해요.</p>
+    <div class="market-row">
+      <div><b>나츠미</b><p>${natsumi.verified ? `인증됨 ${natsumi.emailMasked || ""}` : "미인증"}</p></div>
+      <div><b>유즈하</b><p>${yuzuha.verified ? `인증됨 ${yuzuha.emailMasked || ""}` : "미인증"}</p></div>
+    </div>
+    <div class="market-row">
+      <select id="verifyBot"><option value="natsumi">나츠미 인증</option><option value="yuzuha">유즈하 인증</option></select>
+      <input id="verifyEmail" type="email" placeholder="example@email.com" autocomplete="email" />
+    </div>
+    <div class="market-row">
+      <button id="verifySendBtn" type="button">인증번호 받기</button>
+      <input id="verifyCode" type="text" inputmode="numeric" maxlength="6" placeholder="000000" />
+    </div>
+    <button id="verifyConfirmBtn" type="button">인증번호 확인</button>
+    <p class="market-note">${message || "메일로 받은 6자리 번호를 입력해 주세요."}</p>
+  `;
+  $("#verifySendBtn")?.addEventListener("click", sendMainVerification);
+  $("#verifyConfirmBtn")?.addEventListener("click", confirmMainVerification);
+}
+
+async function sendMainVerification() {
+  if (!requireLogin()) return;
+  const botKey = $("#verifyBot")?.value || "natsumi";
+  const email = $("#verifyEmail")?.value || "";
+  try {
+    const data = await api("/api/verification/email/start", { method: "POST", body: JSON.stringify({ botKey, email }) });
+    renderVerification(`${data.masked || email} 으로 인증번호를 보냈어요.`);
+  } catch (error) {
+    renderVerification(error.message || "인증번호 발송에 실패했어요.");
+  }
+}
+
+async function confirmMainVerification() {
+  if (!requireLogin()) return;
+  const botKey = $("#verifyBot")?.value || "natsumi";
+  const code = $("#verifyCode")?.value || "";
+  try {
+    await api("/api/verification/email/confirm", { method: "POST", body: JSON.stringify({ botKey, code }) });
+    await loadVerificationStatus();
+  } catch (error) {
+    renderVerification(error.message || "인증번호 확인에 실패했어요.");
+  }
 }
 
 function displayNameFor(profile = state.profile) {
@@ -968,6 +1038,7 @@ async function init() {
     $("#donateLink").classList.remove("hidden");
   }
   await loadMe();
+  await loadVerificationStatus();
   try {
     state.shop = await api("/api/shop");
   } catch {

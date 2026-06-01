@@ -4,6 +4,8 @@ import session from 'express-session';
 import mongoose, { Schema, model } from 'mongoose';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import crypto from 'crypto';
+import nodemailer from 'nodemailer';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -31,6 +33,7 @@ const DONATION_NOTICE_CHANNEL_ID = process.env.DONATION_NOTICE_CHANNEL_ID || '15
 const DONATION_VVIP_ROLE_ID = process.env.DONATION_VVIP_ROLE_ID || '1511014086824169562';
 const DONATION_MVP_ROLE_ID = process.env.DONATION_MVP_ROLE_ID || '1511014141760901212';
 const KOFI_VERIFICATION_TOKEN = process.env.KOFI_VERIFICATION_TOKEN || '';
+const BOT_KEYS = new Set(['natsumi', 'yuzuha']);
 const DISCORD_ADMINISTRATOR = 0x8n;
 const DISCORD_MANAGE_GUILD = 0x20n;
 const calculateXP = (level) => level * level * 100;
@@ -227,6 +230,40 @@ const MarketPurchase = model('GameMarketPurchase', new Schema({
   fileData: String,
   createdAt: { type: Date, default: Date.now },
 }));
+const webVerificationSchema = new Schema({
+  botKey: { type: String, required: true, index: true },
+  userId: { type: String, required: true, index: true },
+  emailHash: String,
+  emailMasked: String,
+  phoneHash: String,
+  phoneMasked: String,
+  verified: { type: Boolean, default: false, index: true },
+  method: { type: String, default: 'email' },
+  pendingCodeHash: String,
+  pendingTargetHash: String,
+  pendingTargetMasked: String,
+  pendingExpiresAt: Date,
+  pendingAttempts: { type: Number, default: 0 },
+  createdAt: { type: Date, default: Date.now },
+  updatedAt: { type: Date, default: Date.now },
+});
+webVerificationSchema.index({ botKey: 1, userId: 1 }, { unique: true });
+const WebVerification = model('GameWebVerification', webVerificationSchema);
+const PvpWebSession = model('GamePvpWebSession', new Schema({
+  sessionId: { type: String, unique: true, index: true },
+  botKey: { type: String, default: 'yuzuha', index: true },
+  userId: { type: String, required: true, index: true },
+  game: { type: String, required: true },
+  round: { type: Number, default: 0 },
+  wins: { type: Number, default: 0 },
+  losses: { type: Number, default: 0 },
+  status: { type: String, default: 'active', index: true },
+  state: { type: Schema.Types.Mixed, default: {} },
+  rewardMoney: { type: Number, default: 0 },
+  rewardXp: { type: Number, default: 0 },
+  createdAt: { type: Date, default: Date.now },
+  updatedAt: { type: Date, default: Date.now },
+}));
 
 const animeGoods = {
   GOLDEN: ['황금 여우 피규어', '전설의 마법봉', '한정판 별빛 망토', '프리미엄 나츠미 포스터'],
@@ -263,6 +300,67 @@ function pick(list) { return list[Math.floor(Math.random() * list.length)]; }
 function currentUserId(req) { return req.session?.discordUser?.id || req.body?.userId || req.params?.userId || ''; }
 async function ensureMoney(userId) { let data = await Money.findOne({ userid: userId }); if (!data) data = await Money.create({ userid: userId, money: 0, date: Date.now() }); return data; }
 async function addMoney(userId, delta) { await Money.updateOne({ userid: userId }, { $inc: { money: delta }, $set: { date: Date.now() } }, { upsert: true }); return ensureMoney(userId); }
+function normalizeBotKey(value) {
+  const key = String(value || '').toLowerCase().trim();
+  return BOT_KEYS.has(key) ? key : 'natsumi';
+}
+function botEnv(botKey, name, fallback = '') {
+  const prefix = normalizeBotKey(botKey).toUpperCase();
+  return process.env[`${prefix}_${name}`] || process.env[name] || fallback;
+}
+function maskEmail(email) {
+  const [name = '', domain = ''] = String(email || '').split('@');
+  return `${name.slice(0, 2)}***@${domain}`;
+}
+function hashForVerification(value, botKey) {
+  return crypto.createHmac('sha256', botEnv(botKey, 'EMAIL_VERIFY_SECRET', process.env.AI_EMAIL_VERIFY_SECRET || process.env.SESSION_SECRET || 'natsumi-web-verify'))
+    .update(String(value || '').trim().toLowerCase())
+    .digest('hex');
+}
+function hashWebCode(targetHash, code, userId, botKey) {
+  return crypto.createHmac('sha256', botEnv(botKey, 'EMAIL_VERIFY_SECRET', process.env.AI_EMAIL_VERIFY_SECRET || process.env.SESSION_SECRET || 'natsumi-web-verify'))
+    .update([targetHash, String(code || ''), String(userId || ''), normalizeBotKey(botKey)].join(':'))
+    .digest('hex');
+}
+function mailReady(botKey) {
+  return botEnv(botKey, 'SMTP_HOST') && botEnv(botKey, 'SMTP_USER') && botEnv(botKey, 'SMTP_PASS') && (botEnv(botKey, 'SMTP_FROM') || botEnv(botKey, 'AI_VERIFY_EMAIL_FROM'));
+}
+async function sendWebVerificationEmail({ botKey, email, code }) {
+  if (!mailReady(botKey)) {
+    const error = new Error('email delivery is not configured');
+    error.code = 'MAIL_NOT_CONFIGURED';
+    throw error;
+  }
+  const botName = normalizeBotKey(botKey) === 'yuzuha' ? '유즈하' : '나츠미';
+  const transporter = nodemailer.createTransport({
+    host: botEnv(botKey, 'SMTP_HOST'),
+    port: Number(botEnv(botKey, 'SMTP_PORT', 587)),
+    secure: String(botEnv(botKey, 'SMTP_SECURE', 'false')).toLowerCase() === 'true',
+    auth: { user: botEnv(botKey, 'SMTP_USER'), pass: botEnv(botKey, 'SMTP_PASS') },
+  });
+  await transporter.sendMail({
+    from: botEnv(botKey, 'SMTP_FROM') || botEnv(botKey, 'AI_VERIFY_EMAIL_FROM'),
+    to: email,
+    subject: `[${botName}] 게임센터 이메일 인증번호`,
+    text: `${botName} 게임센터 인증번호는 ${code} 입니다. 10분 안에 입력해 주세요.`,
+    html: `<p><b>${botName}</b> 게임센터 인증번호입니다.</p><p style="font-size:28px;font-weight:800">${code}</p><p>10분 안에 입력해 주세요.</p>`,
+  });
+}
+async function isWebVerified(userId, botKey) {
+  if (!userId) return false;
+  const row = await WebVerification.findOne({ userId, botKey: normalizeBotKey(botKey), verified: true }).lean();
+  return Boolean(row);
+}
+async function requireWebVerified(req, res, next) {
+  const userId = currentUserId(req);
+  const botKey = normalizeBotKey(req.body?.botKey || req.query?.bot || req.headers['x-natsumi-bot']);
+  if (!userId) return res.status(401).json({ error: 'Discord 로그인이 필요해.' });
+  if (!(await isWebVerified(userId, botKey))) {
+    return res.status(403).json({ error: '웹 이메일 인증이 필요해.', needsVerification: true, botKey });
+  }
+  req.botKey = botKey;
+  next();
+}
 function priceState(now = Date.now()) {
   const hours = Math.max(1, Number(process.env.PRICE_CYCLE_HOURS || 6));
   const seed = Math.floor(now / (hours * 60 * 60 * 1000));
@@ -799,6 +897,86 @@ app.post('/api/dashboard/guilds/:guildId/questions/:id/answer', requireLogin, as
   ).lean();
   res.json({ ok: true, question: row });
 });
+app.get('/api/verification/status', requireLogin, async (req, res) => {
+  const userId = req.session.discordUser.id;
+  const bots = ['natsumi', 'yuzuha'];
+  const rows = await WebVerification.find({ userId, botKey: { $in: bots } }).lean();
+  const byBot = Object.fromEntries(rows.map((row) => [row.botKey, row]));
+  res.json({
+    userId,
+    bots: Object.fromEntries(bots.map((botKey) => [botKey, {
+      verified: Boolean(byBot[botKey]?.verified),
+      method: byBot[botKey]?.method || '',
+      emailMasked: byBot[botKey]?.emailMasked || '',
+      phoneMasked: byBot[botKey]?.phoneMasked || '',
+    }])),
+  });
+});
+app.post('/api/verification/email/start', requireLogin, async (req, res, next) => {
+  try {
+    const botKey = normalizeBotKey(req.body?.botKey);
+    const email = String(req.body?.email || '').trim().toLowerCase();
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/i.test(email)) return res.status(400).json({ error: 'Invalid email.' });
+    const code = String(Math.floor(100000 + Math.random() * 900000));
+    const targetHash = hashForVerification(email, botKey);
+    await sendWebVerificationEmail({ botKey, email, code });
+    await WebVerification.findOneAndUpdate(
+      { botKey, userId: req.session.discordUser.id },
+      {
+        $set: {
+          botKey,
+          userId: req.session.discordUser.id,
+          method: 'email',
+          pendingCodeHash: hashWebCode(targetHash, code, req.session.discordUser.id, botKey),
+          pendingTargetHash: targetHash,
+          pendingTargetMasked: maskEmail(email),
+          pendingExpiresAt: new Date(Date.now() + 10 * 60 * 1000),
+          pendingAttempts: 0,
+          updatedAt: new Date(),
+        },
+        $setOnInsert: { createdAt: new Date() },
+      },
+      { upsert: true, new: true, setDefaultsOnInsert: true },
+    );
+    res.json({ ok: true, botKey, masked: maskEmail(email), message: 'Verification code sent.' });
+  } catch (error) {
+    if (error.code === 'MAIL_NOT_CONFIGURED') return res.status(503).json({ error: 'Email delivery is not configured.' });
+    next(error);
+  }
+});
+app.post('/api/verification/email/confirm', requireLogin, async (req, res) => {
+  const botKey = normalizeBotKey(req.body?.botKey);
+  const code = String(req.body?.code || '').replace(/\D/g, '').slice(0, 6);
+  if (code.length !== 6) return res.status(400).json({ error: 'Enter a 6 digit code.' });
+  const row = await WebVerification.findOne({ botKey, userId: req.session.discordUser.id });
+  if (!row?.pendingCodeHash || !row.pendingTargetHash || !row.pendingExpiresAt || row.pendingExpiresAt.getTime() < Date.now()) {
+    return res.status(400).json({ error: 'Verification code is missing or expired.' });
+  }
+  if (row.pendingAttempts >= 5) return res.status(429).json({ error: 'Too many attempts.' });
+  const ok = row.pendingCodeHash === hashWebCode(row.pendingTargetHash, code, req.session.discordUser.id, botKey);
+  if (!ok) {
+    row.pendingAttempts += 1;
+    row.updatedAt = new Date();
+    await row.save();
+    return res.status(400).json({ error: `Wrong code. Remaining attempts: ${Math.max(0, 5 - row.pendingAttempts)}` });
+  }
+  row.verified = true;
+  row.method = 'email';
+  row.emailHash = row.pendingTargetHash;
+  row.emailMasked = row.pendingTargetMasked;
+  row.pendingCodeHash = '';
+  row.pendingTargetHash = '';
+  row.pendingTargetMasked = '';
+  row.pendingExpiresAt = null;
+  row.pendingAttempts = 0;
+  row.updatedAt = new Date();
+  await row.save();
+  res.json({ ok: true, botKey, verified: true, emailMasked: row.emailMasked });
+});
+app.post(['/api/buy', '/api/xp-shop/buy', '/api/support/apply'], requireWebVerified);
+app.use('/api/market', (req, res, next) => (req.method === 'GET' ? next() : requireWebVerified(req, res, next)));
+app.use('/api/games', requireWebVerified);
+app.use('/api/pvp', requireWebVerified);
 app.get('/api/shop', async (req, res) => {
   const [titles, badges] = await Promise.all([
     Title.find().sort({ price: 1 }).lean(),
@@ -1081,6 +1259,148 @@ app.post('/api/games/ono', async (req, res) => {
     delta,
     money: toInt(after.money, 0),
   });
+});
+const pvpGames = new Set(['horse', 'roulette', 'blackjack', 'mines']);
+function pvpPublic(row, message = '') {
+  return {
+    sessionId: row.sessionId,
+    botKey: row.botKey,
+    game: row.game,
+    round: row.round,
+    wins: row.wins,
+    losses: row.losses,
+    status: row.status,
+    state: row.state || {},
+    rewardMoney: row.rewardMoney,
+    rewardXp: row.rewardXp,
+    message,
+  };
+}
+function makePvpState(game) {
+  if (game === 'horse') return { runners: ['fox', 'star', 'moon', 'comet'], track: [0, 0, 0, 0] };
+  if (game === 'blackjack') return { player: [], dealer: [], phase: 'draw' };
+  if (game === 'mines') {
+    const bombs = new Set();
+    while (bombs.size < 5) bombs.add(Math.floor(Math.random() * 25));
+    return { bombs: [...bombs], opened: [], multiplier: 1 };
+  }
+  return { runes: ['sun', 'moon', 'fox', 'star'], last: '' };
+}
+function cardValue(card) {
+  const rank = card.slice(0, -1);
+  if (['J', 'Q', 'K'].includes(rank)) return 10;
+  if (rank === 'A') return 11;
+  return Number(rank) || 0;
+}
+function handTotal(cards) {
+  let total = cards.reduce((sum, card) => sum + cardValue(card), 0);
+  let aces = cards.filter((card) => card.startsWith('A')).length;
+  while (total > 21 && aces > 0) { total -= 10; aces -= 1; }
+  return total;
+}
+function drawCard() {
+  const ranks = ['A', '2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K'];
+  const suits = ['S', 'H', 'D', 'C'];
+  return `${pick(ranks)}${pick(suits)}`;
+}
+async function finishPvp(row, won, detail = '') {
+  row.status = 'finished';
+  const baseMoney = won ? 2500 + row.wins * 1200 + row.round * 300 : 350 + row.wins * 200;
+  const baseXp = won ? 90 + row.wins * 25 + row.round * 10 : 20 + row.wins * 10;
+  row.rewardMoney = baseMoney;
+  row.rewardXp = baseXp;
+  row.updatedAt = new Date();
+  await addMoney(row.userId, baseMoney);
+  await addXp(row.userId, baseXp, DEFAULT_GUILD_ID || 'global');
+  await row.save();
+  return pvpPublic(row, `${won ? 'WIN' : 'END'} ${detail} +${baseMoney} money +${baseXp} xp`);
+}
+async function advancePvp(row, action) {
+  if (row.status !== 'active') return pvpPublic(row, 'This game is already finished.');
+  const state = row.state || {};
+  if (row.game === 'horse') {
+    const pickIndex = Math.max(0, Math.min(3, toInt(action?.runner, 0)));
+    state.track = (state.track || [0, 0, 0, 0]).map((pos) => Math.min(100, pos + 12 + Math.floor(Math.random() * 20)));
+    state.track[pickIndex] = Math.min(100, state.track[pickIndex] + 10 + Math.floor(Math.random() * 18));
+    row.round += 1;
+    const leader = state.track.indexOf(Math.max(...state.track));
+    const roundWin = leader === pickIndex;
+    if (roundWin) row.wins += 1; else row.losses += 1;
+    row.state = state;
+    if (row.round >= 5 || row.wins >= 3 || row.losses >= 3) return finishPvp(row, row.wins > row.losses, `horse ${row.wins}:${row.losses}`);
+    await row.save();
+    return pvpPublic(row, roundWin ? 'Your runner took the lead!' : 'The rival runner got ahead.');
+  }
+  if (row.game === 'roulette') {
+    const choice = String(action?.rune || 'fox');
+    const result = pick(['sun', 'moon', 'fox', 'star']);
+    state.last = result;
+    row.round += 1;
+    if (choice === result) row.wins += 1; else row.losses += 1;
+    row.state = state;
+    if (row.round >= 5 || row.wins >= 3 || row.losses >= 3) return finishPvp(row, row.wins > row.losses, `roulette ${row.wins}:${row.losses}`);
+    await row.save();
+    return pvpPublic(row, choice === result ? 'Rune matched.' : `Rune missed: ${result}`);
+  }
+  if (row.game === 'blackjack') {
+    state.player ||= [drawCard(), drawCard()];
+    state.dealer ||= [drawCard(), drawCard()];
+    const move = String(action?.move || 'hit');
+    if (move === 'hit') state.player.push(drawCard());
+    let player = handTotal(state.player);
+    let dealer = handTotal(state.dealer);
+    let done = move === 'stand' || player >= 21;
+    if (done) {
+      while (dealer < 17) state.dealer.push(drawCard()), dealer = handTotal(state.dealer);
+      row.round += 1;
+      const win = player <= 21 && (dealer > 21 || player >= dealer);
+      if (win) row.wins += 1; else row.losses += 1;
+      state.player = [];
+      state.dealer = [];
+      if (row.round >= 5 || row.wins >= 3 || row.losses >= 3) { row.state = state; return finishPvp(row, row.wins > row.losses, `blackjack ${row.wins}:${row.losses}`); }
+    }
+    row.state = state;
+    await row.save();
+    return pvpPublic(row, done ? `Round done. ${row.wins}:${row.losses}` : `Card drawn. total ${player}`);
+  }
+  if (row.game === 'mines') {
+    const cell = Math.max(0, Math.min(24, toInt(action?.cell, 0)));
+    state.opened ||= [];
+    if (state.opened.includes(cell)) return pvpPublic(row, 'Already opened.');
+    row.round += 1;
+    if ((state.bombs || []).includes(cell)) {
+      row.losses += 1;
+      state.opened.push(cell);
+    } else {
+      row.wins += 1;
+      state.opened.push(cell);
+      state.multiplier = Math.round((Number(state.multiplier || 1) + 0.25) * 100) / 100;
+    }
+    row.state = state;
+    if (row.round >= 8 || row.wins >= 5 || row.losses >= 2) return finishPvp(row, row.wins > row.losses, `mines ${row.wins}:${row.losses}`);
+    await row.save();
+    return pvpPublic(row, row.losses ? 'Careful, a mine exploded.' : 'Safe crystal opened.');
+  }
+  return pvpPublic(row, 'Unknown game.');
+}
+app.post('/api/pvp/start', async (req, res) => {
+  const userId = currentUserId(req);
+  const game = pvpGames.has(String(req.body?.game)) ? String(req.body.game) : 'horse';
+  const row = await PvpWebSession.create({
+    sessionId: crypto.randomUUID(),
+    botKey: normalizeBotKey(req.body?.botKey || 'yuzuha'),
+    userId,
+    game,
+    state: makePvpState(game),
+  });
+  res.json({ ok: true, session: pvpPublic(row, 'Game started.') });
+});
+app.post('/api/pvp/action', async (req, res) => {
+  const userId = currentUserId(req);
+  const row = await PvpWebSession.findOne({ sessionId: String(req.body?.sessionId || ''), userId });
+  if (!row) return res.status(404).json({ error: 'PVP session not found.' });
+  const session = await advancePvp(row, req.body?.action || {});
+  res.json({ ok: true, session, profile: await getProfile(DEFAULT_GUILD_ID, userId) });
 });
 app.get('/api/tax/status', async (req, res) => {
   const last = await TaxLog.findOne().sort({ createdAt: -1 }).lean().catch(() => null);

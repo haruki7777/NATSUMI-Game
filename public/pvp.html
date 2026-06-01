@@ -4,7 +4,7 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
   <meta name="theme-color" content="#160d24" />
-  <title>여우별 PVP 아케이드 | NATSUMI Game</title>
+  <title>Yuzuha PVP Arcade | NATSUMI Game</title>
   <link rel="preload" href="./fonts/dalmoori.woff2" as="font" type="font/woff2" crossorigin />
   <link rel="stylesheet" href="./style.css" />
   <link rel="stylesheet" href="./game-enhance.css" />
@@ -14,37 +14,49 @@
 <body class="pvp-page">
   <main class="pvp-shell">
     <header class="pvp-hero pixel-frame">
-      <a class="pvp-back" href="/">← 게임센터</a>
+      <a class="pvp-back" href="/">&#8592; &#44172;&#51076;&#49468;&#53552;</a>
       <div>
-        <p class="eyebrow">YUZUHA PVP WEB PORT</p>
-        <h1>여우별 PVP 아케이드</h1>
-        <p>유즈하 PVP 아케이드를 웹 게임으로 옮긴 첫 버전이야. 봇과 겨루거나, 나중에 실시간 대전으로 확장할 수 있게 게임별 엔진을 분리했어.</p>
+        <p class="eyebrow">YUZUHA WEB PVP</p>
+        <h1>&#50976;&#51592;&#54616; PVP &#50500;&#52992;&#51060;&#46300;</h1>
+        <p>&#48176;&#54021;&#44552;&#50529;&#51012; &#51077;&#47141;&#54616;&#45716; &#45824;&#49888; &#51649;&#51217; &#49440;&#53469;&#54616;&#44256; &#46972;&#50868;&#46300;&#47484; &#51652;&#54665;&#54644; &#44172;&#51076;&#47672;&#45768;&#50752; XP&#47484; &#50619;&#50612;&#50836;.</p>
       </div>
-      <div id="pvpUser" class="pvp-user">로그인 확인 중...</div>
+      <div id="pvpUser" class="pvp-user">&#47196;&#44536;&#51064; &#54869;&#51064; &#51473;...</div>
     </header>
+
+    <section id="verifyPanel" class="pvp-verify pixel-frame hidden">
+      <h2>&#50976;&#51592;&#54616; &#50937; &#51060;&#47700;&#51068; &#51064;&#51613;</h2>
+      <p>&#50976;&#51592;&#54616; PVP&#45716; &#50976;&#51592;&#54616; &#51064;&#51613;&#51060; &#46384;&#47196; &#54596;&#50836;&#54644;&#50836;. &#45208;&#52768;&#48120; &#51064;&#51613;&#44284; &#49422;&#51060;&#51648; &#50506;&#50500;&#50836;.</p>
+      <div class="pvp-verify-row">
+        <input id="verifyEmail" type="email" placeholder="example@email.com" autocomplete="email" />
+        <button id="sendVerifyBtn" type="button">&#51064;&#51613;&#48264;&#54840; &#48155;&#44592;</button>
+      </div>
+      <div class="pvp-verify-row">
+        <input id="verifyCode" type="text" inputmode="numeric" maxlength="6" placeholder="000000" />
+        <button id="confirmVerifyBtn" type="button">&#54869;&#51064;</button>
+      </div>
+      <p id="verifyMessage" class="market-note"></p>
+    </section>
 
     <section class="pvp-layout">
       <aside class="pvp-menu pixel-frame">
-        <button class="pvp-game active" data-game="horse" type="button"><span>🏇</span><b>여우 경마</b><small>픽셀 트랙 질주</small></button>
-        <a class="pvp-game" href="/ono.html"><span>🃏</span><b>여우별 오노</b><small>전용 페이지</small></a>
-        <button class="pvp-game" data-game="roulette" type="button"><span>🎲</span><b>운명의 룬렛</b><small>위험한 운 시험</small></button>
-        <button class="pvp-game" data-game="blackjack" type="button"><span>🂡</span><b>달빛 블랙잭</b><small>21에 가까워져라</small></button>
-        <button class="pvp-game" data-game="mines" type="button"><span>💣</span><b>마석 지뢰찾기</b><small>안전한 칸 찾기</small></button>
+        <button class="pvp-game active" data-game="horse" type="button"><span>HR</span><b>&#50668;&#50864; &#44221;&#47560;</b><small>&#51452;&#51088;&#47484; &#44256;&#47476;&#44256; &#48512;&#49828;&#53944;</small></button>
+        <a class="pvp-game" href="/ono.html"><span>ON</span><b>&#50668;&#50864;&#48324; &#50724;&#45432;</b><small>&#51204;&#50857; &#54168;&#51060;&#51648;</small></a>
+        <button class="pvp-game" data-game="roulette" type="button"><span>RN</span><b>&#50868;&#47749;&#51032; &#47336;&#45367;</b><small>&#47336;&#45367;&#51012; &#47582;&#52628;&#44592;</small></button>
+        <button class="pvp-game" data-game="blackjack" type="button"><span>BJ</span><b>&#45804;&#48731; &#48660;&#47001;&#51117;</b><small>21&#50640; &#44032;&#44620;&#50892;&#51648;&#44592;</small></button>
+        <button class="pvp-game" data-game="mines" type="button"><span>MN</span><b>&#47560;&#49437; &#51648;&#47280;&#52286;&#44592;</b><small>&#50504;&#51204;&#54620; &#52856;&#51012; &#50676;&#44592;</small></button>
       </aside>
 
       <section class="pvp-stage pixel-frame">
         <div class="pvp-hud">
-          <span id="pvpGameName">여우 경마</span>
-          <span id="pvpMoney">금전 -</span>
-          <span id="pvpScore">PLAYER 0 : 0 NATSUMI</span>
+          <span id="pvpGameName">&#50668;&#50864; &#44221;&#47560;</span>
+          <span id="pvpMoney">&#44172;&#51076;&#47672;&#45768; -</span>
+          <span id="pvpScore">PLAYER 0 : 0 YUZUHA</span>
         </div>
         <div id="pvpScene" class="pvp-scene"></div>
-        <div id="pvpMessage" class="pvp-message">게임을 고르고 시작해. 나츠미가 봇 상대로 먼저 놀아줄게.</div>
+        <div id="pvpMessage" class="pvp-message">Discord &#47196;&#44536;&#51064;&#44284; &#50976;&#51592;&#54616; &#51064;&#51613; &#54980; &#49884;&#51089;&#54644;&#50836;.</div>
         <div class="pvp-controls">
-          <label><span>BET</span><input id="pvpBet" type="number" min="100" step="100" value="1000" inputmode="numeric" /></label>
-          <button id="pvpStartBtn" type="button">대결 시작</button>
-          <button id="pvpRoundBtn" type="button" disabled>라운드 진행</button>
-          <button id="pvpResetBtn" type="button">초기화</button>
+          <button id="pvpStartBtn" type="button">&#44172;&#51076; &#49884;&#51089;</button>
+          <button id="pvpResetBtn" type="button">&#49352; &#44172;&#51076;</button>
         </div>
         <div id="pvpChoices" class="pvp-choices"></div>
         <div id="pvpLog" class="pvp-log"></div>
