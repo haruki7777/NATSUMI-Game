@@ -27,6 +27,9 @@ const BOT_API_BASE_URL = process.env.BOT_API_BASE_URL || process.env.NATSUMI_BOT
 const KOREANBOTS_TOKEN = process.env.KOREANBOTS_TOKEN || '';
 const KOREANBOTS_BOT_ID = process.env.KOREANBOTS_BOT_ID || '';
 const DEVELOPER_NOTICE_CHANNEL_ID = process.env.DEVELOPER_NOTICE_CHANNEL_ID || '1371675674393448528';
+const DONATION_NOTICE_CHANNEL_ID = process.env.DONATION_NOTICE_CHANNEL_ID || '1511013156263166065';
+const DONATION_VVIP_ROLE_ID = process.env.DONATION_VVIP_ROLE_ID || '1511014086824169562';
+const DONATION_MVP_ROLE_ID = process.env.DONATION_MVP_ROLE_ID || '1511014141760901212';
 const DISCORD_ADMINISTRATOR = 0x8n;
 const DISCORD_MANAGE_GUILD = 0x20n;
 const calculateXP = (level) => level * level * 100;
@@ -229,6 +232,51 @@ async function addMoney(userId, delta) { await Money.updateOne({ userid: userId 
 async function addXp(userId, delta, guildId = DEFAULT_GUILD_ID || 'global') {
   await LevelSystem.updateOne({ GuildID: guildId, UserID: userId }, { $inc: { xp: delta } }, { upsert: true });
   return LevelSystem.findOne({ GuildID: guildId, UserID: userId }).lean();
+}
+async function discordApi(pathname, options = {}) {
+  if (!DISCORD_BOT_TOKEN) return null;
+  const headers = { Authorization: `Bot ${DISCORD_BOT_TOKEN}`, 'Content-Type': 'application/json', ...(options.headers || {}) };
+  return fetch(`https://discord.com/api/v10${pathname}`, { ...options, headers });
+}
+async function sendDonationChannelNotice(row, tier, status = 'pending') {
+  if (!DONATION_NOTICE_CHANNEL_ID || !row || !tier) return false;
+  try {
+    const color = status === 'approved' ? 0x57f287 : status === 'rejected' ? 0xed4245 : 0xff7ab6;
+    const title = status === 'approved' ? '후원 지급 완료' : status === 'rejected' ? '후원 확인 실패' : '후원 도착';
+    const res = await discordApi(`/channels/${DONATION_NOTICE_CHANNEL_ID}/messages`, {
+      method: 'POST',
+      body: JSON.stringify({
+        embeds: [{
+          title,
+          description: `${tier.emoji || '💖'} ${tier.name} 후원 요청이 들어왔어.`,
+          color,
+          fields: [
+            { name: '후원자', value: row.username || row.name || row.userId || 'unknown', inline: true },
+            { name: '금액', value: `${Number(row.amount || 0).toLocaleString('ko-KR')}원`, inline: true },
+            { name: '상태', value: status, inline: true },
+            row.memo ? { name: '메모', value: String(row.memo).slice(0, 900), inline: false } : null,
+          ].filter(Boolean),
+          timestamp: new Date().toISOString(),
+        }],
+        allowed_mentions: { parse: [] },
+      }),
+    });
+    return Boolean(res?.ok);
+  } catch {
+    return false;
+  }
+}
+async function grantDonationDiscordRole(userId, tier) {
+  if (!userId || !DONATION_NOTICE_CHANNEL_ID || !DISCORD_BOT_TOKEN) return false;
+  const channelRes = await discordApi(`/channels/${DONATION_NOTICE_CHANNEL_ID}`).catch(() => null);
+  if (!channelRes?.ok) return false;
+  const channel = await channelRes.json().catch(() => null);
+  const guildId = channel?.guild_id;
+  if (!guildId) return false;
+  const roleId = ['star', 'legend'].includes(tier?.key) ? DONATION_VVIP_ROLE_ID : DONATION_MVP_ROLE_ID;
+  if (!roleId) return false;
+  const roleRes = await discordApi(`/guilds/${guildId}/members/${userId}/roles/${roleId}`, { method: 'PUT', body: '' }).catch(() => null);
+  return Boolean(roleRes?.ok || roleRes?.status === 204);
 }
 function getSupportTier(amount) { return [...supportTiers].reverse().find((tier) => amount >= tier.min) || null; }
 function supportRewards(tier) { return tier ? { title: `support_${tier.key}_title`, badge: `support_${tier.key}_badge`, money: tier.money } : {}; }
@@ -761,6 +809,7 @@ app.post('/api/support/apply', async (req, res) => {
   });
 
   const ownerNotified = await sendOwnerSupportDm(row, tier);
+  await sendDonationChannelNotice(row, tier, 'pending');
   res.json({
     ok: true,
     id: row._id,
@@ -787,18 +836,22 @@ app.post('/api/support/requests/:id/approve', async (req, res) => {
   const tier = supportTiers.find((item) => item.key === row.tierKey) || getSupportTier(row.amount);
   if (!tier || row.userId === 'guest') return res.status(400).json({ error: '로그인된 후원자만 자동 지급할 수 있어. 서포트에서 수동 확인해줘.' });
   const rewards = await grantSupportRewards(row.userId, tier);
+  const roleGranted = await grantDonationDiscordRole(row.userId, tier);
   row.status = 'approved';
   row.tierKey = tier.key;
   row.tierName = tier.name;
   row.rewards = rewards;
   row.processedAt = new Date();
   await row.save();
-  res.json({ ok: true, status: row.status, tier, rewards, message: `${tier.name} 지급 완료` });
+  await sendDonationChannelNotice(row, tier, 'approved');
+  res.json({ ok: true, status: row.status, tier, rewards, roleGranted, message: `${tier.name} 지급 완료` });
 });
 app.post('/api/support/requests/:id/reject', async (req, res) => {
   if (!OWNER_USER_ID || req.session?.discordUser?.id !== OWNER_USER_ID) return res.status(403).json({ error: '운영자만 반려할 수 있어.' });
   const row = await SupportRequest.findByIdAndUpdate(req.params.id, { $set: { status: 'rejected', processedAt: new Date() } }, { new: true });
   if (!row) return res.status(404).json({ error: '후원 요청을 찾지 못했어.' });
+  const tier = supportTiers.find((item) => item.key === row.tierKey) || getSupportTier(row.amount);
+  if (tier) await sendDonationChannelNotice(row, tier, 'rejected');
   res.json({ ok: true, status: row.status, message: '입금 확인 실패. 관리자에게 문의해줘.' });
 });
 
