@@ -2,7 +2,7 @@
   position: fixed;
   top: 0;
   right: 0;
-  z-index: 120;
+  z-index: 3000;
   display: flex;
   flex-direction: column;
   gap: 18px;
@@ -46,7 +46,7 @@
 .menu-backdrop {
   position: fixed;
   inset: 0;
-  z-index: 90;
+  z-index: 2990;
   background: rgba(0, 0, 0, .58);
   opacity: 0;
   pointer-events: none;
@@ -57,6 +57,12 @@
   pointer-events: auto;
 }
 body.menu-open { overflow: hidden; }
+
+#menuToggle,
+#menuClose {
+  position: relative;
+  z-index: 3010;
+}
 
 @media (min-width: 1080px) {
   .drawer-menu {

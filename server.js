@@ -251,6 +251,7 @@ webVerificationSchema.index({ botKey: 1, userId: 1 }, { unique: true });
 const WebVerification = model('GameWebVerification', webVerificationSchema);
 const PvpWebSession = model('GamePvpWebSession', new Schema({
   sessionId: { type: String, unique: true, index: true },
+  roomId: { type: String, index: true },
   botKey: { type: String, default: 'yuzuha', index: true },
   userId: { type: String, required: true, index: true },
   game: { type: String, required: true },
@@ -261,6 +262,21 @@ const PvpWebSession = model('GamePvpWebSession', new Schema({
   state: { type: Schema.Types.Mixed, default: {} },
   rewardMoney: { type: Number, default: 0 },
   rewardXp: { type: Number, default: 0 },
+  createdAt: { type: Date, default: Date.now },
+  updatedAt: { type: Date, default: Date.now },
+}));
+const PvpRoom = model('GamePvpRoom', new Schema({
+  roomId: { type: String, unique: true, index: true },
+  roomCode: { type: String, unique: true, index: true },
+  botKey: { type: String, default: 'yuzuha', index: true },
+  game: { type: String, required: true, index: true },
+  mode: { type: String, default: 'private', index: true },
+  guildId: { type: String, default: '', index: true },
+  hostId: { type: String, required: true, index: true },
+  status: { type: String, default: 'waiting', index: true },
+  players: { type: [Schema.Types.Mixed], default: [] },
+  bots: { type: Number, default: 0 },
+  activeSessionId: String,
   createdAt: { type: Date, default: Date.now },
   updatedAt: { type: Date, default: Date.now },
 }));
@@ -351,11 +367,20 @@ async function isWebVerified(userId, botKey) {
   const row = await WebVerification.findOne({ userId, botKey: normalizeBotKey(botKey), verified: true }).lean();
   return Boolean(row);
 }
+async function isAnyWebVerified(userId) {
+  if (!userId) return false;
+  const row = await WebVerification.findOne({
+    userId,
+    verified: true,
+    botKey: { $in: [...BOT_KEYS] },
+  }).lean();
+  return Boolean(row);
+}
 async function requireWebVerified(req, res, next) {
   const userId = currentUserId(req);
   const botKey = normalizeBotKey(req.body?.botKey || req.query?.bot || req.headers['x-natsumi-bot']);
   if (!userId) return res.status(401).json({ error: 'Discord 로그인이 필요해.' });
-  if (!(await isWebVerified(userId, botKey))) {
+  if (!(await isAnyWebVerified(userId))) {
     return res.status(403).json({ error: '웹 이메일 인증이 필요해.', needsVerification: true, botKey });
   }
   req.botKey = botKey;
@@ -1264,6 +1289,7 @@ const pvpGames = new Set(['horse', 'roulette', 'blackjack', 'mines']);
 function pvpPublic(row, message = '') {
   return {
     sessionId: row.sessionId,
+    roomId: row.roomId || '',
     botKey: row.botKey,
     game: row.game,
     round: row.round,
@@ -1275,6 +1301,41 @@ function pvpPublic(row, message = '') {
     rewardXp: row.rewardXp,
     message,
   };
+}
+function makeRoomCode() {
+  return crypto.randomBytes(3).toString('hex').toUpperCase();
+}
+function pvpRoomPublic(row, message = '') {
+  return {
+    roomId: row.roomId,
+    roomCode: row.roomCode,
+    botKey: row.botKey,
+    game: row.game,
+    mode: row.mode,
+    guildId: row.guildId || '',
+    hostId: row.hostId,
+    status: row.status,
+    players: row.players || [],
+    bots: Number(row.bots || 0),
+    canStart: Number(row.bots || 0) + Number(row.players?.length || 0) >= 2,
+    activeSessionId: row.activeSessionId || '',
+    message,
+  };
+}
+function playerFromSession(req) {
+  const user = req.session?.discordUser || {};
+  const userId = currentUserId(req);
+  return { userId, username: user.username || user.global_name || `Player-${String(userId).slice(-4)}` };
+}
+function roomHasPlayer(row, userId) {
+  return Boolean((row.players || []).some((player) => String(player.userId) === String(userId)));
+}
+function ensureRoomPlayer(row, req) {
+  const player = playerFromSession(req);
+  if (player.userId && !roomHasPlayer(row, player.userId)) {
+    row.players.push(player);
+    row.updatedAt = new Date();
+  }
 }
 function makePvpState(game) {
   if (game === 'horse') return { runners: ['fox', 'star', 'moon', 'comet'], track: [0, 0, 0, 0] };
@@ -1305,7 +1366,7 @@ function drawCard() {
 }
 async function finishPvp(row, won, detail = '') {
   row.status = 'finished';
-  const baseMoney = won ? 2500 + row.wins * 1200 + row.round * 300 : 350 + row.wins * 200;
+  const baseMoney = won ? 2500 + row.wins * 1200 + row.round * 300 : -Math.max(500, Number(process.env.PVP_LOSS_PENALTY || 1500));
   const baseXp = won ? 90 + row.wins * 25 + row.round * 10 : 20 + row.wins * 10;
   row.rewardMoney = baseMoney;
   row.rewardXp = baseXp;
@@ -1313,7 +1374,7 @@ async function finishPvp(row, won, detail = '') {
   await addMoney(row.userId, baseMoney);
   await addXp(row.userId, baseXp, DEFAULT_GUILD_ID || 'global');
   await row.save();
-  return pvpPublic(row, `${won ? 'WIN' : 'END'} ${detail} +${baseMoney} money +${baseXp} xp`);
+  return pvpPublic(row, `${won ? 'WIN' : 'LOSE'} ${detail} ${baseMoney > 0 ? '+' : ''}${baseMoney} money +${baseXp} xp`);
 }
 async function advancePvp(row, action) {
   if (row.status !== 'active') return pvpPublic(row, 'This game is already finished.');
@@ -1332,15 +1393,16 @@ async function advancePvp(row, action) {
     return pvpPublic(row, roundWin ? 'Your runner took the lead!' : 'The rival runner got ahead.');
   }
   if (row.game === 'roulette') {
-    const choice = String(action?.rune || 'fox');
-    const result = pick(['sun', 'moon', 'fox', 'star']);
-    state.last = result;
+    const move = String(action?.rune || action?.move || 'shoot');
+    const hit = move !== 'pass' && Math.random() < (1 / 6);
+    const safe = move === 'pass' ? Math.random() < 0.45 : !hit;
+    state.last = hit ? 'hit' : move === 'pass' ? 'pass' : 'safe';
     row.round += 1;
-    if (choice === result) row.wins += 1; else row.losses += 1;
+    if (safe) row.wins += 1; else row.losses += 1;
     row.state = state;
     if (row.round >= 5 || row.wins >= 3 || row.losses >= 3) return finishPvp(row, row.wins > row.losses, `roulette ${row.wins}:${row.losses}`);
     await row.save();
-    return pvpPublic(row, choice === result ? 'Rune matched.' : `Rune missed: ${result}`);
+    return pvpPublic(row, safe ? '총구가 빗나갔어. 이번 판은 살았어!' : '탕! 이번 판은 유즈하에게 넘어갔어.');
   }
   if (row.game === 'blackjack') {
     state.player ||= [drawCard(), drawCard()];
@@ -1383,16 +1445,103 @@ async function advancePvp(row, action) {
   }
   return pvpPublic(row, 'Unknown game.');
 }
+app.post('/api/pvp/rooms', async (req, res) => {
+  const userId = currentUserId(req);
+  if (!userId) return res.status(401).json({ error: 'Discord login required.' });
+  const game = pvpGames.has(String(req.body?.game)) ? String(req.body.game) : 'horse';
+  const mode = ['private', 'quick', 'bot'].includes(String(req.body?.mode)) ? String(req.body.mode) : 'private';
+  const botKey = normalizeBotKey(req.body?.botKey || 'yuzuha');
+  const guildId = String(req.body?.guildId || '');
+
+  if (mode === 'quick') {
+    const waiting = await PvpRoom.findOne({
+      botKey,
+      game,
+      mode: 'quick',
+      status: 'waiting',
+      'players.userId': { $ne: userId },
+    }).sort({ createdAt: 1 });
+    if (waiting) {
+      ensureRoomPlayer(waiting, req);
+      if (Number(waiting.players?.length || 0) + Number(waiting.bots || 0) >= 2) waiting.status = 'ready';
+      await waiting.save();
+      return res.json({ ok: true, room: pvpRoomPublic(waiting, 'Matched. The room is ready.') });
+    }
+  }
+
+  const room = new PvpRoom({
+    roomId: crypto.randomUUID(),
+    roomCode: makeRoomCode(),
+    botKey,
+    game,
+    mode,
+    guildId,
+    hostId: userId,
+    status: mode === 'bot' ? 'ready' : 'waiting',
+    bots: mode === 'bot' ? 1 : 0,
+    players: [playerFromSession(req)],
+  });
+  await room.save();
+  res.json({ ok: true, room: pvpRoomPublic(room, mode === 'bot' ? 'Bot match is ready.' : 'Room created.') });
+});
+app.get('/api/pvp/rooms/:roomId', async (req, res) => {
+  const row = await PvpRoom.findOne({ roomId: String(req.params.roomId) }).lean();
+  if (!row) return res.status(404).json({ error: 'PVP room not found.' });
+  res.json({ ok: true, room: pvpRoomPublic(row) });
+});
+app.post('/api/pvp/rooms/:roomId/join', async (req, res) => {
+  const userId = currentUserId(req);
+  if (!userId) return res.status(401).json({ error: 'Discord login required.' });
+  const row = await PvpRoom.findOne({ roomId: String(req.params.roomId) });
+  if (!row) return res.status(404).json({ error: 'PVP room not found.' });
+  if (row.status === 'active' || row.status === 'finished') return res.status(409).json({ error: 'This room already started.' });
+  ensureRoomPlayer(row, req);
+  if (Number(row.players?.length || 0) + Number(row.bots || 0) >= 2) row.status = 'ready';
+  await row.save();
+  res.json({ ok: true, room: pvpRoomPublic(row, 'Joined.') });
+});
+app.post('/api/pvp/rooms/:roomId/bot', async (req, res) => {
+  const userId = currentUserId(req);
+  const row = await PvpRoom.findOne({ roomId: String(req.params.roomId) });
+  if (!row) return res.status(404).json({ error: 'PVP room not found.' });
+  if (String(row.hostId) !== String(userId)) return res.status(403).json({ error: 'Only the host can add a bot.' });
+  row.bots = Math.max(1, Number(row.bots || 0));
+  if (Number(row.players?.length || 0) + row.bots >= 2) row.status = 'ready';
+  row.updatedAt = new Date();
+  await row.save();
+  res.json({ ok: true, room: pvpRoomPublic(row, 'Bot joined.') });
+});
 app.post('/api/pvp/start', async (req, res) => {
   const userId = currentUserId(req);
   const game = pvpGames.has(String(req.body?.game)) ? String(req.body.game) : 'horse';
+  const stake = Math.max(100, Number(process.env.PVP_STAKE || 1500));
+  const money = await ensureMoney(userId);
+  if (toInt(money.money, 0) < stake) return res.status(400).json({ error: '게임머니가 부족해. 돈 벌고 다시 와줘.' });
+  const roomId = String(req.body?.roomId || '');
+  let room = null;
+  if (roomId) {
+    room = await PvpRoom.findOne({ roomId });
+    if (!room) return res.status(404).json({ error: 'PVP room not found.' });
+    if (!roomHasPlayer(room, userId)) ensureRoomPlayer(room, req);
+    if (Number(room.players?.length || 0) + Number(room.bots || 0) < 2) {
+      await room.save();
+      return res.status(409).json({ error: '2명 이상이 필요해. 혼자라면 봇전을 눌러줘.', needsPlayers: true, room: pvpRoomPublic(room) });
+    }
+    room.status = 'active';
+    room.updatedAt = new Date();
+  }
   const row = await PvpWebSession.create({
     sessionId: crypto.randomUUID(),
+    roomId,
     botKey: normalizeBotKey(req.body?.botKey || 'yuzuha'),
     userId,
     game,
     state: makePvpState(game),
   });
+  if (room) {
+    room.activeSessionId = row.sessionId;
+    await room.save();
+  }
   res.json({ ok: true, session: pvpPublic(row, 'Game started.') });
 });
 app.post('/api/pvp/action', async (req, res) => {

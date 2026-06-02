@@ -1,13 +1,16 @@
 const $ = (q) => document.querySelector(q);
+const params = new URLSearchParams(location.search);
+
 const gameNames = {
   horse: '여우 경마',
-  roulette: '운명의 룬렛',
+  roulette: '러시안 룰렛',
   blackjack: '달빛 블랙잭',
   mines: '마석 지뢰찾기',
 };
 
-let currentGame = 'horse';
+let currentGame = params.get('game') || 'horse';
 let currentSession = null;
+let currentRoom = null;
 let verified = false;
 
 async function api(url, options = {}) {
@@ -38,18 +41,33 @@ function logLine(text) {
   log.prepend(p);
 }
 
+function setMessage(text, tone = '') {
+  const el = $('#pvpMessage');
+  if (!el) return;
+  el.textContent = text;
+  el.dataset.tone = tone;
+}
+
+function renderRoom(room) {
+  currentRoom = room || currentRoom;
+  const text = currentRoom
+    ? `${currentRoom.mode === 'quick' ? '빠른매칭' : currentRoom.mode === 'bot' ? '봇전' : '비공개 방'} ${currentRoom.roomCode} | 참가 ${currentRoom.players?.length || 0}명 + 봇 ${currentRoom.bots || 0}`
+    : '방을 만들거나 빠른매칭을 시작해줘.';
+  setText('#pvpRoom', text);
+}
+
 function renderScene(session) {
   const scene = $('#pvpScene');
   if (!scene) return;
   const state = session?.state || {};
   if (currentGame === 'horse') {
-    const names = ['여우', '별빛', '달그림자', '혜성'];
+    const names = ['유즈하', '별꼬리', '달그림자', '혜성'];
     const track = state.track || [0, 0, 0, 0];
-    scene.innerHTML = `<div class="race-track">${track.map((pos, i) => `<div class="race-lane"><span class="runner" style="transform:translateX(${Math.min(86, pos)}%)">${i === 0 ? 'F' : i === 1 ? 'S' : i === 2 ? 'M' : 'C'}</span><b>${names[i]}</b></div>`).join('')}</div>`;
+    scene.innerHTML = `<div class="race-track">${track.map((pos, i) => `<div class="race-lane"><span class="runner" style="transform:translateX(${Math.min(86, pos)}%)">${['🦊', '⭐', '🌙', '☄️'][i]}</span><b>${names[i]}</b></div>`).join('')}</div>`;
     return;
   }
   if (currentGame === 'roulette') {
-    scene.innerHTML = `<div class="rune-circle"><span>SUN</span><span>MOON</span><span>FOX</span><span>STAR</span></div>`;
+    scene.innerHTML = '<div class="rune-circle gun-circle"><span>1</span><span>2</span><span>3</span><span>4</span><b>🔫</b></div>';
     return;
   }
   if (currentGame === 'blackjack') {
@@ -71,17 +89,17 @@ function renderChoices(session) {
     return;
   }
   if (currentGame === 'horse') {
-    box.innerHTML = ['여우', '별빛', '달그림자', '혜성'].map((name, i) => `<button type="button" data-runner="${i}">${name} 부스트</button>`).join('');
+    box.innerHTML = ['유즈하', '별꼬리', '달그림자', '혜성'].map((name, i) => `<button type="button" data-runner="${i}">${name} 밀어주기</button>`).join('');
     box.querySelectorAll('[data-runner]').forEach((btn) => btn.addEventListener('click', () => sendAction({ runner: Number(btn.dataset.runner) })));
     return;
   }
   if (currentGame === 'roulette') {
-    box.innerHTML = ['sun', 'moon', 'fox', 'star'].map((rune) => `<button type="button" data-rune="${rune}">${rune.toUpperCase()}</button>`).join('');
+    box.innerHTML = '<button type="button" data-rune="fox">한 발 쏘기</button><button type="button" data-rune="pass">넘기기</button>';
     box.querySelectorAll('[data-rune]').forEach((btn) => btn.addEventListener('click', () => sendAction({ rune: btn.dataset.rune })));
     return;
   }
   if (currentGame === 'blackjack') {
-    box.innerHTML = `<button type="button" data-move="hit">카드 뽑기</button><button type="button" data-move="stand">멈추기</button>`;
+    box.innerHTML = '<button type="button" data-move="hit">카드 뽑기</button><button type="button" data-move="stand">멈추기</button>';
     box.querySelectorAll('[data-move]').forEach((btn) => btn.addEventListener('click', () => sendAction({ move: btn.dataset.move })));
     return;
   }
@@ -92,7 +110,7 @@ function renderSession(session) {
   currentSession = session || currentSession;
   setText('#pvpGameName', gameNames[currentGame] || 'PVP');
   setText('#pvpScore', `PLAYER ${currentSession?.wins || 0} : ${currentSession?.losses || 0} YUZUHA`);
-  setText('#pvpMessage', currentSession?.message || `${gameNames[currentGame]} 준비 완료`);
+  setMessage(currentSession?.message || `${gameNames[currentGame]} 준비 완료`);
   renderScene(currentSession);
   renderChoices(currentSession);
   if (currentSession?.status === 'finished') logLine(currentSession.message || '게임 종료');
@@ -101,8 +119,8 @@ function renderSession(session) {
 async function refreshProfile() {
   try {
     const profile = await api('/api/profile/me');
-    setText('#pvpMoney', `게임머니 ${Number(profile.money || 0).toLocaleString()} · Lv.${profile.level || 1}`);
-    $('#pvpUser').innerHTML = `<b>${profile.displayName || 'PLAYER'}</b><small>Yuzuha verified arcade</small>`;
+    setText('#pvpMoney', `게임머니 ${Number(profile.money || 0).toLocaleString()} | Lv.${profile.level || 1}`);
+    $('#pvpUser').innerHTML = `<b>${profile.displayName || 'PLAYER'}</b><small>Yuzuha web arcade</small>`;
   } catch {
     $('#pvpUser').innerHTML = '<a class="primary-link" href="/auth/discord">Discord 로그인</a>';
   }
@@ -111,31 +129,57 @@ async function refreshProfile() {
 async function refreshVerification() {
   try {
     const data = await api('/api/verification/status');
-    verified = Boolean(data.bots?.yuzuha?.verified);
+    verified = Boolean(data.bots?.yuzuha?.verified || data.bots?.natsumi?.verified);
     $('#verifyPanel')?.classList.toggle('hidden', verified);
-    setText('#verifyMessage', verified ? `인증됨: ${data.bots.yuzuha.emailMasked || 'OK'}` : '유즈하 인증이 필요해.');
+    const mask = data.bots?.yuzuha?.emailMasked || data.bots?.natsumi?.emailMasked || 'OK';
+    setText('#verifyMessage', verified ? `인증 완료: ${mask}` : '나츠미 또는 유즈하 중 한쪽 이메일 인증이 필요해.');
   } catch {
     verified = false;
     $('#verifyPanel')?.classList.remove('hidden');
   }
 }
 
+async function createRoom(mode) {
+  if (!verified) {
+    setMessage('먼저 이메일 인증을 완료해줘.', 'ready');
+    $('#verifyPanel')?.classList.remove('hidden');
+    return null;
+  }
+  const data = await api('/api/pvp/rooms', {
+    method: 'POST',
+    body: JSON.stringify({ botKey: 'yuzuha', game: currentGame, mode, guildId: params.get('guildId') || '' }),
+  });
+  renderRoom(data.room);
+  setMessage(data.room.message || '방 준비 완료', data.room.canStart ? 'ready' : '');
+  logLine(data.room.message || 'PVP 방을 만들었어.');
+  if (mode === 'bot' || data.room.canStart) await startGame();
+  return data.room;
+}
+
 async function startGame() {
   if (!verified) {
-    setText('#pvpMessage', '먼저 유즈하 이메일 인증을 끝내줘.');
+    setMessage('먼저 이메일 인증을 완료해줘.', 'ready');
     $('#verifyPanel')?.classList.remove('hidden');
     return;
   }
-  const data = await api('/api/pvp/start', { method: 'POST', body: JSON.stringify({ botKey: 'yuzuha', game: currentGame }) });
-  renderSession(data.session);
-  logLine(`${gameNames[currentGame]} 시작`);
+  try {
+    const data = await api('/api/pvp/start', {
+      method: 'POST',
+      body: JSON.stringify({ botKey: 'yuzuha', game: currentGame, roomId: currentRoom?.roomId || '' }),
+    });
+    renderSession(data.session);
+    logLine(`${gameNames[currentGame]} 시작`);
+  } catch (error) {
+    if (error.data?.room) renderRoom(error.data.room);
+    setMessage(error.message, error.data?.needsPlayers ? 'ready' : 'lose');
+  }
 }
 
 async function sendAction(action) {
   if (!currentSession?.sessionId) return;
   const data = await api('/api/pvp/action', { method: 'POST', body: JSON.stringify({ botKey: 'yuzuha', sessionId: currentSession.sessionId, action }) });
   renderSession(data.session);
-  if (data.profile) setText('#pvpMoney', `게임머니 ${Number(data.profile.money || 0).toLocaleString()} · Lv.${data.profile.level || 1}`);
+  if (data.profile) setText('#pvpMoney', `게임머니 ${Number(data.profile.money || 0).toLocaleString()} | Lv.${data.profile.level || 1}`);
 }
 
 async function sendVerification() {
@@ -153,19 +197,26 @@ async function confirmVerification() {
     const code = $('#verifyCode').value.trim();
     await api('/api/verification/email/confirm', { method: 'POST', body: JSON.stringify({ botKey: 'yuzuha', code }) });
     await refreshVerification();
-    setText('#pvpMessage', '인증 완료. 이제 PVP를 시작할 수 있어.');
+    setMessage('인증 완료. 이제 PVP를 시작할 수 있어.', 'ready');
   } catch (error) {
     setText('#verifyMessage', error.message);
   }
 }
 
+function selectGame(game) {
+  currentGame = gameNames[game] ? game : 'horse';
+  currentSession = null;
+  currentRoom = null;
+  document.querySelectorAll('[data-game]').forEach((item) => item.classList.toggle('active', item.dataset.game === currentGame));
+  renderRoom(null);
+  renderSession({ game: currentGame, wins: 0, losses: 0, state: {}, message: `${gameNames[currentGame]} 선택 완료` });
+}
+
 function bind() {
-  document.querySelectorAll('[data-game]').forEach((btn) => btn.addEventListener('click', () => {
-    currentGame = btn.dataset.game || 'horse';
-    currentSession = null;
-    document.querySelectorAll('[data-game]').forEach((item) => item.classList.toggle('active', item === btn));
-    renderSession({ game: currentGame, wins: 0, losses: 0, state: {}, message: `${gameNames[currentGame]} 선택 완료` });
-  }));
+  document.querySelectorAll('[data-game]').forEach((btn) => btn.addEventListener('click', () => selectGame(btn.dataset.game || 'horse')));
+  $('#privateRoomBtn')?.addEventListener('click', () => createRoom('private'));
+  $('#quickMatchBtn')?.addEventListener('click', () => createRoom('quick'));
+  $('#botMatchBtn')?.addEventListener('click', () => createRoom('bot'));
   $('#pvpStartBtn')?.addEventListener('click', startGame);
   $('#pvpResetBtn')?.addEventListener('click', () => { currentSession = null; renderSession({ game: currentGame, wins: 0, losses: 0, state: {}, message: '새 게임 준비 완료' }); });
   $('#sendVerifyBtn')?.addEventListener('click', sendVerification);
@@ -174,8 +225,10 @@ function bind() {
 
 async function init() {
   bind();
+  selectGame(currentGame);
   await Promise.all([refreshProfile(), refreshVerification()]);
-  renderSession({ game: currentGame, wins: 0, losses: 0, state: {}, message: '게임을 선택하고 시작해줘.' });
+  const mode = params.get('mode');
+  if (['private', 'quick', 'bot'].includes(mode)) await createRoom(mode);
 }
 
 init();
