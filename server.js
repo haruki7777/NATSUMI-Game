@@ -12,7 +12,7 @@ const __dirname = path.dirname(__filename);
 const app = express();
 app.set('trust proxy', 1);
 
-const PORT = process.env.PORT || 3000;
+const PORT = Number(process.env.PORT || process.env.WEB_PORT || 25772);
 const DEFAULT_GUILD_ID = process.env.DEFAULT_GUILD_ID || '';
 const DONATION_URL = process.env.DONATION_URL || '';
 const DONATION_ACCOUNT = process.env.DONATION_ACCOUNT || '';
