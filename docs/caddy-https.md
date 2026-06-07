@@ -17,26 +17,35 @@
    - `natsumi-game.kro.kr`
    - `api.natsumi-game.kro.kr`
 2. 서버 방화벽과 호스팅 패널에서 `80`, `443` 포트를 연다.
-3. Caddy를 설치한다.
-4. `deploy/Caddyfile` 내용을 서버의 `/etc/caddy/Caddyfile`에 적용한다.
-5. 문법을 확인한다.
+3. 기존 nginx나 Vortexa 기본 페이지가 `80`, `443`을 잡고 있으면 먼저 비활성화한다.
+
+```bash
+sudo systemctl stop nginx || true
+sudo systemctl disable nginx || true
+```
+
+4. Caddy를 설치한다.
+5. `deploy/Caddyfile` 내용을 서버의 `/etc/caddy/Caddyfile`에 적용한다.
+6. 문법을 확인한다.
 
 ```bash
 sudo caddy validate --config /etc/caddy/Caddyfile
 ```
 
-6. Caddy를 다시 불러온다.
+7. Caddy를 다시 불러온다.
 
 ```bash
 sudo systemctl reload caddy
 ```
 
-7. HTTPS 응답을 확인한다.
+8. HTTPS 응답을 확인한다.
 
 ```bash
 curl -I https://natsumidashboard.kro.kr
 curl -I https://natsumi-game.kro.kr
 ```
+
+응답 본문이 `Vortexa Cloud`이면 아직 nginx/default site가 도메인을 가로채는 상태다. Caddy가 `80`, `443`을 직접 받아야 한다.
 
 ## Discord Developer Portal 리디렉션
 
