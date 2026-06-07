@@ -1,4 +1,5 @@
 import 'dotenv/config';
+import './utils/cloudflaredTunnel.js';
 import express from 'express';
 import session from 'express-session';
 import mongoose, { Schema, model } from 'mongoose';
