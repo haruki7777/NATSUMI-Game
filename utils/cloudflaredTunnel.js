@@ -13,6 +13,7 @@ const token = String(
 ).trim();
 
 let child = null;
+let restartTimer = null;
 
 function cloudflaredUrl() {
   const platform = os.platform();
@@ -64,6 +65,10 @@ async function ensureCloudflared() {
 export async function startCloudflaredTunnel() {
   if (!token) return;
   if (child) return;
+  if (restartTimer) {
+    clearTimeout(restartTimer);
+    restartTimer = null;
+  }
 
   try {
     const bin = await ensureCloudflared();
@@ -83,15 +88,34 @@ export async function startCloudflaredTunnel() {
     child.on('exit', (code) => {
       child = null;
       console.warn(`[cloudflared] tunnel exited with code ${code}`);
+      scheduleRestart();
     });
 
     console.log('[cloudflared] game tunnel starting.');
   } catch (error) {
     console.warn(`[cloudflared] game tunnel could not start: ${error?.message || error}`);
+    scheduleRestart();
   }
 }
 
-process.once('SIGTERM', () => child?.kill('SIGTERM'));
-process.once('SIGINT', () => child?.kill('SIGINT'));
+function scheduleRestart() {
+  if (!token || restartTimer) return;
+  restartTimer = setTimeout(() => {
+    restartTimer = null;
+    startCloudflaredTunnel();
+  }, 15000);
+  restartTimer.unref?.();
+}
+
+function stopCloudflaredTunnel(signal) {
+  if (restartTimer) {
+    clearTimeout(restartTimer);
+    restartTimer = null;
+  }
+  child?.kill(signal);
+}
+
+process.once('SIGTERM', () => stopCloudflaredTunnel('SIGTERM'));
+process.once('SIGINT', () => stopCloudflaredTunnel('SIGINT'));
 
 startCloudflaredTunnel();
