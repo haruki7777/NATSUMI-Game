@@ -12,19 +12,20 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const app = express();
 app.set('trust proxy', 1);
+app.disable('x-powered-by');
 
 const PORT = Number(process.env.PORT || process.env.WEB_PORT || 25772);
 const DEFAULT_GUILD_ID = process.env.DEFAULT_GUILD_ID || '';
 const DONATION_URL = process.env.DONATION_URL || '';
 const DONATION_ACCOUNT = process.env.DONATION_ACCOUNT || '';
 const DONATION_BANK_ACCOUNT = process.env.DONATION_BANK_ACCOUNT || 'IBK기업은행 08706196201017';
-const PUBLIC_BASE_URL = (process.env.PUBLIC_BASE_URL || 'https://natsumi-game.kro.kr').replace(/\/$/, '');
+const PUBLIC_BASE_URL = (process.env.PUBLIC_BASE_URL || 'http://natsumi-game.kro.kr').replace(/\/$/, '');
 const DISCORD_CLIENT_ID = process.env.DISCORD_CLIENT_ID || '';
 const DISCORD_CLIENT_SECRET = process.env.DISCORD_CLIENT_SECRET || '';
 const DISCORD_BOT_TOKEN = process.env.DISCORD_BOT_TOKEN || process.env.TOKEN || '';
 const DISCORD_REDIRECT_URI = process.env.DISCORD_REDIRECT_URI || `${PUBLIC_BASE_URL}/auth/discord/callback`;
 const OWNER_USER_ID = process.env.OWNER_USER_ID || process.env.NATSUMI_OWNER_ID || '1293232804745838733';
-const DASHBOARD_URL = process.env.DASHBOARD_URL || 'https://natsumidashboard.kro.kr/';
+const DASHBOARD_URL = process.env.DASHBOARD_URL || 'http://natsumidashboard.kro.kr/';
 const SITE_URL = process.env.SITE_URL || PUBLIC_BASE_URL;
 const BOT_API_BASE_URL = process.env.BOT_API_BASE_URL || process.env.NATSUMI_BOT_API_BASE_URL || '';
 const KOREANBOTS_TOKEN = process.env.KOREANBOTS_TOKEN || '';
@@ -39,6 +40,40 @@ const DISCORD_ADMINISTRATOR = 0x8n;
 const DISCORD_MANAGE_GUILD = 0x20n;
 const calculateXP = (level) => level * level * 100;
 const escapeHtml = (value = '') => String(value).replace(/[&<>"']/g, (ch) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[ch]));
+const RATE_LIMIT_WINDOW_MS = Number(process.env.RATE_LIMIT_WINDOW_MS || 60_000);
+const RATE_LIMIT_MAX = Number(process.env.RATE_LIMIT_MAX || 180);
+const AUTH_RATE_LIMIT_MAX = Number(process.env.AUTH_RATE_LIMIT_MAX || 35);
+const rateBuckets = new Map();
+
+function clientIp(req) {
+  const forwarded = String(req.headers['x-forwarded-for'] || '').split(',')[0].trim();
+  return forwarded || req.socket.remoteAddress || 'unknown';
+}
+
+function rateLimit(maxRequests = RATE_LIMIT_MAX) {
+  return (req, res, next) => {
+    const now = Date.now();
+    const key = `${clientIp(req)}:${req.path.startsWith('/auth') ? 'auth' : 'site'}`;
+    const bucket = rateBuckets.get(key);
+    if (!bucket || now - bucket.startedAt > RATE_LIMIT_WINDOW_MS) {
+      rateBuckets.set(key, { startedAt: now, count: 1 });
+      return next();
+    }
+    bucket.count += 1;
+    if (bucket.count > maxRequests) {
+      res.setHeader('Retry-After', String(Math.ceil((RATE_LIMIT_WINDOW_MS - (now - bucket.startedAt)) / 1000)));
+      return res.status(429).json({ error: 'Too many requests. Please slow down.' });
+    }
+    return next();
+  };
+}
+
+setInterval(() => {
+  const now = Date.now();
+  for (const [key, bucket] of rateBuckets.entries()) {
+    if (now - bucket.startedAt > RATE_LIMIT_WINDOW_MS * 2) rateBuckets.delete(key);
+  }
+}, RATE_LIMIT_WINDOW_MS).unref?.();
 async function sendOwnerSupportDm(row, tier) {
   if (!DISCORD_BOT_TOKEN || !OWNER_USER_ID || !row || !tier) return false;
   try {
@@ -81,6 +116,17 @@ async function sendOwnerSupportDm(row, tier) {
   }
 }
 
+app.use((req, res, next) => {
+  res.setHeader('X-Content-Type-Options', 'nosniff');
+  res.setHeader('X-Frame-Options', 'SAMEORIGIN');
+  res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
+  res.setHeader('Permissions-Policy', 'camera=(), microphone=(), geolocation=(), payment=()');
+  res.setHeader('Cross-Origin-Resource-Policy', 'same-site');
+  next();
+});
+app.use(rateLimit());
+app.use('/auth', rateLimit(AUTH_RATE_LIMIT_MAX));
+app.use('/api', rateLimit(Number(process.env.API_RATE_LIMIT_MAX || RATE_LIMIT_MAX)));
 app.use(express.json({ limit: process.env.MARKET_UPLOAD_LIMIT || '2mb' }));
 app.use(express.urlencoded({ extended: false, limit: process.env.MARKET_UPLOAD_LIMIT || '2mb' }));
 app.use((req, res, next) => {
@@ -92,7 +138,7 @@ app.use((req, res, next) => {
   next();
 });
 app.use((req, res, next) => {
-  const allowed = (process.env.ALLOWED_ORIGINS || process.env.ALLOWED_ORIGIN || `${DASHBOARD_URL},${SITE_URL},https://natsumi-game.kro.kr,https://natsumi-site.kro.kr,https://api.natsumidashboard.kro.kr`)
+  const allowed = (process.env.ALLOWED_ORIGINS || process.env.ALLOWED_ORIGIN || `${DASHBOARD_URL},${SITE_URL},http://natsumi-game.kro.kr,http://natsumi-site.kro.kr,http://api.natsumidashboard.kro.kr`)
     .split(',')
     .map((origin) => origin.trim().replace(/\/$/, ''))
     .filter(Boolean);
