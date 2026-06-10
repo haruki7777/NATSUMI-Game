@@ -4,10 +4,10 @@
 
 ## 연결 구조
 
-- `https://natsumidashboard.kro.kr` -> `127.0.0.1:25901`
-- `https://api.natsumidashboard.kro.kr` -> `127.0.0.1:25901`
-- `https://natsumi-game.kro.kr` -> `127.0.0.1:25772`
-- `https://api.natsumi-game.kro.kr` -> `127.0.0.1:25772`
+- `http://natsumidashboard.kro.kr` -> `127.0.0.1:25901`
+- `http://api.natsumidashboard.kro.kr` -> `127.0.0.1:25901`
+- `http://natsumi-game.kro.kr` -> `127.0.0.1:25772`
+- `http://api.natsumi-game.kro.kr` -> `127.0.0.1:25772`
 
 ## 서버 작업 순서
 
@@ -41,8 +41,8 @@ sudo systemctl reload caddy
 8. HTTPS 응답을 확인한다.
 
 ```bash
-curl -I https://natsumidashboard.kro.kr
-curl -I https://natsumi-game.kro.kr
+curl -I http://natsumidashboard.kro.kr
+curl -I http://natsumi-game.kro.kr
 ```
 
 응답 본문이 `Vortexa Cloud`이면 아직 nginx/default site가 도메인을 가로채는 상태다. Caddy가 `80`, `443`을 직접 받아야 한다.
@@ -51,20 +51,20 @@ curl -I https://natsumi-game.kro.kr
 
 아래 URI 4개를 정확히 등록한다.
 
-- `https://natsumidashboard.kro.kr/auth/discord/callback`
-- `https://natsumidashboard.kro.kr/auth/discord/dashboard/callback`
-- `https://natsumi-game.kro.kr/auth/discord/callback`
-- `https://natsumi-game.kro.kr/auth/discord/game/callback`
+- `http://natsumidashboard.kro.kr/auth/discord/callback`
+- `http://natsumidashboard.kro.kr/auth/discord/dashboard/callback`
+- `http://natsumi-game.kro.kr/auth/discord/callback`
+- `http://natsumi-game.kro.kr/auth/discord/game/callback`
 
 ## 환경변수 기준
 
 ```env
-DASHBOARD_URL=https://natsumidashboard.kro.kr/
-GAME_URL=https://natsumi-game.kro.kr/
-SITE_URL=https://natsumi-site.kro.kr/
-PUBLIC_BASE_URL=https://natsumi-game.kro.kr
-ALLOWED_ORIGINS=https://natsumidashboard.kro.kr,https://natsumi-game.kro.kr,https://natsumi-site.kro.kr
-DISCORD_REDIRECT_URI=https://natsumi-game.kro.kr/auth/discord/callback
+DASHBOARD_URL=http://natsumidashboard.kro.kr/
+GAME_URL=http://natsumi-game.kro.kr/
+SITE_URL=http://natsumi-site.kro.kr/
+PUBLIC_BASE_URL=http://natsumi-game.kro.kr
+ALLOWED_ORIGINS=http://natsumidashboard.kro.kr,http://natsumi-game.kro.kr,http://natsumi-site.kro.kr
+DISCORD_REDIRECT_URI=http://natsumi-game.kro.kr/auth/discord/callback
 ```
 
 ## 주의

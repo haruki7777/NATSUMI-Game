@@ -37,15 +37,15 @@ printed by the app logs.
 Use HTTPS URLs only:
 
 ```text
-https://natsumi-game.kro.kr/auth/discord/callback
-https://natsumi-game.kro.kr/auth/discord/game/callback
+http://natsumi-game.kro.kr/auth/discord/callback
+http://natsumi-game.kro.kr/auth/discord/game/callback
 ```
 
 ## Health check
 
 ```bash
-curl -I https://natsumi-game.kro.kr
-curl -L https://natsumi-game.kro.kr/api/status
+curl -I http://natsumi-game.kro.kr
+curl -L http://natsumi-game.kro.kr/api/status
 ```
 
 API responses must return JSON, not SPA fallback HTML.
