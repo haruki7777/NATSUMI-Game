@@ -131,17 +131,17 @@ async function refreshVerification() {
     const data = await api('/api/verification/status');
     verified = Boolean(data.bots?.yuzuha?.verified || data.bots?.natsumi?.verified);
     $('#verifyPanel')?.classList.toggle('hidden', verified);
-    const mask = data.bots?.yuzuha?.emailMasked || data.bots?.natsumi?.emailMasked || 'OK';
-    setText('#verifyMessage', verified ? `인증 완료: ${mask}` : '나츠미 또는 유즈하 중 한쪽 이메일 인증이 필요해.');
+    setText('#verifyMessage', verified ? 'Discord 로그인 인증 완료' : 'Discord 로그인이 필요해.');
   } catch {
     verified = false;
     $('#verifyPanel')?.classList.remove('hidden');
+    setText('#verifyMessage', 'Discord 로그인을 확인하지 못했어. 다시 로그인해줘.');
   }
 }
 
 async function createRoom(mode) {
   if (!verified) {
-    setMessage('먼저 이메일 인증을 완료해줘.', 'ready');
+    setMessage('먼저 Discord 로그인을 완료해줘.', 'ready');
     $('#verifyPanel')?.classList.remove('hidden');
     return null;
   }
@@ -158,7 +158,7 @@ async function createRoom(mode) {
 
 async function startGame() {
   if (!verified) {
-    setMessage('먼저 이메일 인증을 완료해줘.', 'ready');
+    setMessage('먼저 Discord 로그인을 완료해줘.', 'ready');
     $('#verifyPanel')?.classList.remove('hidden');
     return;
   }
@@ -183,24 +183,12 @@ async function sendAction(action) {
 }
 
 async function sendVerification() {
-  try {
-    const email = $('#verifyEmail').value.trim();
-    const data = await api('/api/verification/email/start', { method: 'POST', body: JSON.stringify({ botKey: 'yuzuha', email }) });
-    setText('#verifyMessage', `${data.masked} 으로 인증번호를 보냈어.`);
-  } catch (error) {
-    setText('#verifyMessage', error.message);
-  }
+  await refreshVerification();
 }
 
 async function confirmVerification() {
-  try {
-    const code = $('#verifyCode').value.trim();
-    await api('/api/verification/email/confirm', { method: 'POST', body: JSON.stringify({ botKey: 'yuzuha', code }) });
-    await refreshVerification();
-    setMessage('인증 완료. 이제 PVP를 시작할 수 있어.', 'ready');
-  } catch (error) {
-    setText('#verifyMessage', error.message);
-  }
+  await refreshVerification();
+  if (verified) setMessage('Discord 로그인 인증 완료. 이제 PVP를 시작할 수 있어.', 'ready');
 }
 
 function selectGame(game) {

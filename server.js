@@ -6,7 +6,6 @@ import mongoose, { Schema, model } from 'mongoose';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import crypto from 'crypto';
-import nodemailer from 'nodemailer';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -319,7 +318,7 @@ const webVerificationSchema = new Schema({
   phoneHash: String,
   phoneMasked: String,
   verified: { type: Boolean, default: false, index: true },
-  method: { type: String, default: 'email' },
+  method: { type: String, default: 'discord' },
   pendingCodeHash: String,
   pendingTargetHash: String,
   pendingTargetMasked: String,
@@ -405,48 +404,34 @@ function botEnv(botKey, name, fallback = '') {
   const prefix = normalizeBotKey(botKey).toUpperCase();
   return process.env[`${prefix}_${name}`] || process.env[name] || fallback;
 }
-function maskEmail(email) {
-  const [name = '', domain = ''] = String(email || '').split('@');
-  return `${name.slice(0, 2)}***@${domain}`;
-}
-function hashForVerification(value, botKey) {
-  return crypto.createHmac('sha256', botEnv(botKey, 'EMAIL_VERIFY_SECRET', process.env.AI_EMAIL_VERIFY_SECRET || process.env.SESSION_SECRET || 'natsumi-web-verify'))
-    .update(String(value || '').trim().toLowerCase())
-    .digest('hex');
-}
-function hashWebCode(targetHash, code, userId, botKey) {
-  return crypto.createHmac('sha256', botEnv(botKey, 'EMAIL_VERIFY_SECRET', process.env.AI_EMAIL_VERIFY_SECRET || process.env.SESSION_SECRET || 'natsumi-web-verify'))
-    .update([targetHash, String(code || ''), String(userId || ''), normalizeBotKey(botKey)].join(':'))
-    .digest('hex');
-}
-function mailReady(botKey) {
-  return botEnv(botKey, 'SMTP_HOST') && botEnv(botKey, 'SMTP_USER') && botEnv(botKey, 'SMTP_PASS') && (botEnv(botKey, 'SMTP_FROM') || botEnv(botKey, 'AI_VERIFY_EMAIL_FROM'));
-}
-async function sendWebVerificationEmail({ botKey, email, code }) {
-  if (!mailReady(botKey)) {
-    const error = new Error('email delivery is not configured');
-    error.code = 'MAIL_NOT_CONFIGURED';
-    throw error;
-  }
-  const botName = normalizeBotKey(botKey) === 'yuzuha' ? '유즈하' : '나츠미';
-  const transporter = nodemailer.createTransport({
-    host: botEnv(botKey, 'SMTP_HOST'),
-    port: Number(botEnv(botKey, 'SMTP_PORT', 587)),
-    secure: String(botEnv(botKey, 'SMTP_SECURE', 'false')).toLowerCase() === 'true',
-    auth: { user: botEnv(botKey, 'SMTP_USER'), pass: botEnv(botKey, 'SMTP_PASS') },
-  });
-  await transporter.sendMail({
-    from: botEnv(botKey, 'SMTP_FROM') || botEnv(botKey, 'AI_VERIFY_EMAIL_FROM'),
-    to: email,
-    subject: `[${botName}] 게임센터 이메일 인증번호`,
-    text: `${botName} 게임센터 인증번호는 ${code} 입니다. 10분 안에 입력해 주세요.`,
-    html: `<p><b>${botName}</b> 게임센터 인증번호입니다.</p><p style="font-size:28px;font-weight:800">${code}</p><p>10분 안에 입력해 주세요.</p>`,
-  });
-}
 async function isWebVerified(userId, botKey) {
   if (!userId) return false;
   const row = await WebVerification.findOne({ userId, botKey: normalizeBotKey(botKey), verified: true }).lean();
   return Boolean(row);
+}
+async function markDiscordVerified(userId) {
+  if (!userId) return false;
+  const now = new Date();
+  await Promise.all([...BOT_KEYS].map((botKey) => WebVerification.findOneAndUpdate(
+    { botKey, userId },
+    {
+      $set: {
+        botKey,
+        userId,
+        verified: true,
+        method: 'discord',
+        pendingCodeHash: '',
+        pendingTargetHash: '',
+        pendingTargetMasked: '',
+        pendingExpiresAt: null,
+        pendingAttempts: 0,
+        updatedAt: now,
+      },
+      $setOnInsert: { createdAt: now },
+    },
+    { upsert: true, new: true, setDefaultsOnInsert: true },
+  )));
+  return true;
 }
 async function isAnyWebVerified(userId) {
   if (!userId) return false;
@@ -460,10 +445,8 @@ async function isAnyWebVerified(userId) {
 async function requireWebVerified(req, res, next) {
   const userId = currentUserId(req);
   const botKey = normalizeBotKey(req.body?.botKey || req.query?.bot || req.headers['x-natsumi-bot']);
-  if (!userId) return res.status(401).json({ error: 'Discord 로그인이 필요해.' });
-  if (!(await isAnyWebVerified(userId))) {
-    return res.status(403).json({ error: '웹 이메일 인증이 필요해.', needsVerification: true, botKey });
-  }
+  if (!userId) return res.status(401).json({ error: 'Discord login is required.', needsLogin: true });
+  await markDiscordVerified(userId);
   req.botKey = botKey;
   next();
 }
@@ -835,6 +818,7 @@ async function finishDiscordAuth(req, res, redirectUri) {
     const user = await userRes.json();
     req.session.discordAccessToken = token.access_token;
     req.session.discordUser = { id: user.id, username: user.username, globalName: user.global_name, avatar: user.avatar };
+    await markDiscordVerified(user.id);
     const returnTo = req.session.oauthReturnTo || '/';
     delete req.session.oauthReturnTo;
     delete req.session.oauthRedirectUri;
@@ -1005,79 +989,39 @@ app.post('/api/dashboard/guilds/:guildId/questions/:id/answer', requireLogin, as
 });
 app.get('/api/verification/status', requireLogin, async (req, res) => {
   const userId = req.session.discordUser.id;
+  await markDiscordVerified(userId);
   const bots = ['natsumi', 'yuzuha'];
-  const rows = await WebVerification.find({ userId, botKey: { $in: bots } }).lean();
-  const byBot = Object.fromEntries(rows.map((row) => [row.botKey, row]));
   res.json({
     userId,
+    method: 'discord',
     bots: Object.fromEntries(bots.map((botKey) => [botKey, {
-      verified: Boolean(byBot[botKey]?.verified),
-      method: byBot[botKey]?.method || '',
-      emailMasked: byBot[botKey]?.emailMasked || '',
-      phoneMasked: byBot[botKey]?.phoneMasked || '',
+      verified: true,
+      method: 'discord',
+      emailMasked: '',
+      phoneMasked: '',
     }])),
   });
 });
-app.post('/api/verification/email/start', requireLogin, async (req, res, next) => {
-  try {
-    const botKey = normalizeBotKey(req.body?.botKey);
-    const email = String(req.body?.email || '').trim().toLowerCase();
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/i.test(email)) return res.status(400).json({ error: 'Invalid email.' });
-    const code = String(Math.floor(100000 + Math.random() * 900000));
-    const targetHash = hashForVerification(email, botKey);
-    await sendWebVerificationEmail({ botKey, email, code });
-    await WebVerification.findOneAndUpdate(
-      { botKey, userId: req.session.discordUser.id },
-      {
-        $set: {
-          botKey,
-          userId: req.session.discordUser.id,
-          method: 'email',
-          pendingCodeHash: hashWebCode(targetHash, code, req.session.discordUser.id, botKey),
-          pendingTargetHash: targetHash,
-          pendingTargetMasked: maskEmail(email),
-          pendingExpiresAt: new Date(Date.now() + 10 * 60 * 1000),
-          pendingAttempts: 0,
-          updatedAt: new Date(),
-        },
-        $setOnInsert: { createdAt: new Date() },
-      },
-      { upsert: true, new: true, setDefaultsOnInsert: true },
-    );
-    res.json({ ok: true, botKey, masked: maskEmail(email), message: 'Verification code sent.' });
-  } catch (error) {
-    if (error.code === 'MAIL_NOT_CONFIGURED') return res.status(503).json({ error: 'Email delivery is not configured.' });
-    next(error);
-  }
+app.post('/api/verification/email/start', requireLogin, async (req, res) => {
+  const userId = req.session.discordUser.id;
+  await markDiscordVerified(userId);
+  res.json({
+    ok: true,
+    botKey: normalizeBotKey(req.body?.botKey),
+    verified: true,
+    method: 'discord',
+    message: 'Discord login is enough for game center access.',
+  });
 });
 app.post('/api/verification/email/confirm', requireLogin, async (req, res) => {
-  const botKey = normalizeBotKey(req.body?.botKey);
-  const code = String(req.body?.code || '').replace(/\D/g, '').slice(0, 6);
-  if (code.length !== 6) return res.status(400).json({ error: 'Enter a 6 digit code.' });
-  const row = await WebVerification.findOne({ botKey, userId: req.session.discordUser.id });
-  if (!row?.pendingCodeHash || !row.pendingTargetHash || !row.pendingExpiresAt || row.pendingExpiresAt.getTime() < Date.now()) {
-    return res.status(400).json({ error: 'Verification code is missing or expired.' });
-  }
-  if (row.pendingAttempts >= 5) return res.status(429).json({ error: 'Too many attempts.' });
-  const ok = row.pendingCodeHash === hashWebCode(row.pendingTargetHash, code, req.session.discordUser.id, botKey);
-  if (!ok) {
-    row.pendingAttempts += 1;
-    row.updatedAt = new Date();
-    await row.save();
-    return res.status(400).json({ error: `Wrong code. Remaining attempts: ${Math.max(0, 5 - row.pendingAttempts)}` });
-  }
-  row.verified = true;
-  row.method = 'email';
-  row.emailHash = row.pendingTargetHash;
-  row.emailMasked = row.pendingTargetMasked;
-  row.pendingCodeHash = '';
-  row.pendingTargetHash = '';
-  row.pendingTargetMasked = '';
-  row.pendingExpiresAt = null;
-  row.pendingAttempts = 0;
-  row.updatedAt = new Date();
-  await row.save();
-  res.json({ ok: true, botKey, verified: true, emailMasked: row.emailMasked });
+  const userId = req.session.discordUser.id;
+  await markDiscordVerified(userId);
+  res.json({
+    ok: true,
+    botKey: normalizeBotKey(req.body?.botKey),
+    verified: true,
+    method: 'discord',
+  });
 });
 app.post(['/api/buy', '/api/xp-shop/buy', '/api/support/apply'], requireWebVerified);
 app.use('/api/market', (req, res, next) => (req.method === 'GET' ? next() : requireWebVerified(req, res, next)));
