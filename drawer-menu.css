@@ -69,6 +69,11 @@
 }
 body.menu-open { overflow: hidden; }
 
+body.menu-open .topbar {
+  position: sticky;
+  z-index: 2147483002;
+}
+
 body.menu-open .layout,
 body.menu-open .policy-footer,
 body.menu-open .hero-card,
@@ -88,7 +93,7 @@ body.menu-open #menuClose {
 #menuToggle,
 #menuClose {
   position: relative;
-  z-index: 2147483001;
+  z-index: 2147483004;
 }
 
 .drawer-menu .nav-menu {
