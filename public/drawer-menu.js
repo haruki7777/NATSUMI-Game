@@ -39,10 +39,13 @@
     openBtn.addEventListener("click", open);
     closeBtn?.addEventListener("click", close);
     backdrop.addEventListener("click", close);
-    document.querySelectorAll(".nav-btn").forEach((btn) => btn.addEventListener("click", (event) => {
+    document.querySelectorAll("button.nav-btn[data-view]").forEach((btn) => btn.addEventListener("click", (event) => {
       event.preventDefault();
       event.stopPropagation();
       activateView(btn.dataset.view);
+    }));
+    document.querySelectorAll("a.nav-btn[href]").forEach((link) => link.addEventListener("click", () => {
+      close();
     }));
     window.addEventListener("keydown", (event) => {
       if (event.key === "Escape") close();

@@ -969,7 +969,7 @@ function bindUiEvents() {
     event.preventDefault();
     goLogin();
   });
-  document.querySelectorAll(".nav-btn").forEach((button) => button.addEventListener("click", (event) => {
+  document.querySelectorAll("button.nav-btn[data-view]").forEach((button) => button.addEventListener("click", (event) => {
     event.preventDefault();
     event.stopPropagation();
     showView(button.dataset.view);
