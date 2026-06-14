@@ -17,6 +17,11 @@ dashboard tunnel token unless both services run in the same container.
 
 ```env
 GAME_CLOUDFLARED_TUNNEL_TOKEN=your_game_tunnel_token
+USE_CLOUDFLARE_HTTPS=true
+PUBLIC_SERVICE_SCHEME=https
+PUBLIC_BASE_URL=https://natsumi-game.kro.kr
+DASHBOARD_URL=https://natsumidashboard.kro.kr/
+DISCORD_REDIRECT_URI=https://natsumi-game.kro.kr/auth/discord/callback
 ```
 
 6. Add public hostnames to the same tunnel:
@@ -37,15 +42,15 @@ printed by the app logs.
 Use HTTPS URLs only:
 
 ```text
-http://natsumi-game.kro.kr/auth/discord/callback
-http://natsumi-game.kro.kr/auth/discord/game/callback
+https://natsumi-game.kro.kr/auth/discord/callback
+https://natsumi-game.kro.kr/auth/discord/game/callback
 ```
 
 ## Health check
 
 ```bash
-curl -I http://natsumi-game.kro.kr
-curl -L http://natsumi-game.kro.kr/api/status
+curl -I https://natsumi-game.kro.kr
+curl -L https://natsumi-game.kro.kr/api/status
 ```
 
 API responses must return JSON, not SPA fallback HTML.

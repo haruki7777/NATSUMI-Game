@@ -24,11 +24,15 @@ const HTTP_PUBLIC_HOSTS = new Set([
   'api.natsumidashboard.kro.kr',
   'api.natsumi-game.kro.kr',
 ]);
+const PUBLIC_SERVICE_SCHEME = String(
+  process.env.PUBLIC_SERVICE_SCHEME
+    || (String(process.env.USE_CLOUDFLARE_HTTPS || '').toLowerCase() === 'true' ? 'https' : 'http'),
+).replace(/:$/, '');
 function normalizePublicServiceUrl(value, fallback) {
   const raw = String(value || fallback).trim();
   try {
     const url = new URL(raw);
-    if (HTTP_PUBLIC_HOSTS.has(url.hostname)) url.protocol = 'http:';
+    if (HTTP_PUBLIC_HOSTS.has(url.hostname)) url.protocol = `${PUBLIC_SERVICE_SCHEME}:`;
     return url.toString();
   } catch {
     return fallback;
