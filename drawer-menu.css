@@ -2,7 +2,7 @@
   position: fixed;
   top: 0;
   right: 0;
-  z-index: 9000;
+  z-index: 2147483000;
   display: flex;
   flex-direction: column;
   gap: 18px;
@@ -30,7 +30,15 @@
   background: rgba(87, 45, 68, .32);
 }
 
-.drawer-menu.open { transform: translateX(0); }
+.drawer-menu.open {
+  transform: translateX(0);
+  pointer-events: auto;
+}
+
+.drawer-menu.open,
+.drawer-menu.open * {
+  pointer-events: auto;
+}
 .drawer-head {
   display: flex;
   align-items: center;
@@ -49,7 +57,7 @@
 .menu-backdrop {
   position: fixed;
   inset: 0;
-  z-index: 8990;
+  z-index: 2147482990;
   background: rgba(0, 0, 0, .58);
   opacity: 0;
   pointer-events: none;
@@ -61,10 +69,26 @@
 }
 body.menu-open { overflow: hidden; }
 
+body.menu-open .layout,
+body.menu-open .policy-footer,
+body.menu-open .hero-card,
+body.menu-open .view,
+body.menu-open .arcade-hero {
+  pointer-events: none;
+}
+
+body.menu-open #drawerMenu,
+body.menu-open #drawerMenu *,
+body.menu-open #menuBackdrop,
+body.menu-open #menuToggle,
+body.menu-open #menuClose {
+  pointer-events: auto;
+}
+
 #menuToggle,
 #menuClose {
   position: relative;
-  z-index: 9010;
+  z-index: 2147483001;
 }
 
 .drawer-menu .nav-menu {

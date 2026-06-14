@@ -2,102 +2,228 @@
 <html lang="ko">
 <head>
   <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>NATSUMI Game Arcade</title>
-  <link rel="stylesheet" href="./style.css" />
-  <link rel="stylesheet" href="./background.css" />
-  <link rel="stylesheet" href="./game-enhance.css" />
-  <link rel="stylesheet" href="./drawer-menu.css" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="theme-color" content="#120918" />
+  <title>NATSUMI Game Center</title>
+  <link rel="preload" href="./fonts/dalmoori.woff2" as="font" type="font/woff2" crossorigin />
+  <link rel="stylesheet" href="./style.css?v=20260614-menu3" />
+  <link rel="stylesheet" href="./background.css?v=20260614-menu3" />
+  <link rel="stylesheet" href="./game-enhance.css?v=20260614-menu3" />
+  <link rel="stylesheet" href="./fox-fantasy-pixel.css?v=20260614-menu3" />
+  <link rel="stylesheet" href="./drawer-menu.css?v=20260614-menu3" />
 </head>
 <body>
-  <div id="arcadePetals" class="arcade-petals" aria-hidden="true"></div>
-  <div class="bg-orb orb-a"></div><div class="bg-orb orb-b"></div>
   <div id="menuBackdrop" class="menu-backdrop"></div>
+
   <header class="topbar">
-    <a class="brand" href="#home"><span class="fox-gif">🦊</span><b>NATSUMI Arcade</b></a>
-    <button id="menuToggle" class="hamburger" type="button" aria-label="메뉴 열기" aria-expanded="false">☰</button>
+    <a class="brand" href="#home" aria-label="NATSUMI Game Center">
+      <span class="brand-mark"><img src="./assets/natsumi-profile-03.jpg" alt="" /></span>
+      <b>NATSUMI Game Center</b>
+    </a>
+    <button id="menuToggle" class="hamburger" type="button" aria-label="메뉴 열기" aria-expanded="false">
+      <span></span><span></span><span></span>
+    </button>
     <aside id="drawerMenu" class="drawer-menu" aria-hidden="true">
-      <div class="drawer-head"><b>🦊 메뉴</b><button id="menuClose" class="ghost" type="button">닫기</button></div>
-      <nav class="nav-menu">
-        <button data-view="profile" class="nav-btn active">프로필</button>
-        <button data-view="games" class="nav-btn">게임</button>
-        <button data-view="shop" class="nav-btn">상점</button>
-        <button data-view="support" class="nav-btn">후원</button>
-        <button data-view="rank" class="nav-btn">랭크카드</button>
+      <div class="drawer-head">
+        <b>NATSUMI MENU</b>
+        <button id="menuClose" class="ghost" type="button">닫기</button>
+      </div>
+      <nav class="nav-menu" aria-label="주요 메뉴">
+        <button data-view="profile" class="nav-btn active" type="button">프로필</button>
+        <button data-view="games" class="nav-btn" type="button">게임센터</button>
+        <button data-view="inventory" class="nav-btn" type="button">가방/도감</button>
+        <button data-view="shop" class="nav-btn" type="button">상점</button>
+        <button data-view="market" class="nav-btn" type="button">&#54028;&#51068;&#49345;&#51216;</button>
+        <button data-view="xpShop" class="nav-btn" type="button">경험치 상점</button>
+        <button data-view="premium" class="nav-btn" type="button">프리미엄</button>
+        <button data-view="support" class="nav-btn" type="button">후원</button>
+        <button data-view="rank" class="nav-btn" type="button">랭크카드</button>
+        <a class="nav-btn" href="http://natsumidashboard.kro.kr/" target="_blank" rel="noreferrer">대시보드</a>
+        <a class="nav-btn" href="/" rel="noreferrer">게임센터</a>
       </nav>
       <div class="login-box">
-        <button id="bgmBtn" class="ghost" type="button">🎵 BGM 켜기</button>
         <span id="loginName">게스트 모드</span>
         <a id="loginBtn" class="primary-link" href="/auth/discord">Discord 로그인</a>
-        <button id="logoutBtn" class="ghost hidden">로그아웃</button>
+        <button id="logoutBtn" class="ghost hidden" type="button">로그아웃</button>
+        <button id="themeToggle" class="ghost theme-toggle" type="button" aria-pressed="false">화이트 모드</button>
       </div>
     </aside>
   </header>
 
   <main id="home" class="layout">
-    <section class="arcade-menu-panel" aria-label="game center menu">
-      <button data-view="profile" class="nav-btn active">프로필</button>
-      <button data-view="games" class="nav-btn">게임</button>
-      <button data-view="shop" class="nav-btn">상점</button>
-      <button data-view="support" class="nav-btn">후원</button>
-      <button data-view="rank" class="nav-btn">랭크카드</button>
-    </section>
-
-    <section class="hero-card">
-      <div>
-        <p class="eyebrow">FOX GAME PORTAL</p>
-        <h1>나츠미 게임센터에 온 걸 환영해.</h1>
-        <p class="sub">디스코드 로그인만 하면 출석, 금전, 랭크, 칭호, 뱃지, 게임 상점까지 한 화면에서 볼 수 있어. 후원자는 전용 프로필 효과와 뱃지까지 쓸 수 있어.</p>
+    <section class="hero-card arcade-hero">
+      <div class="hero-copy">
+        <p class="eyebrow">PIXEL GAME CENTER</p>
+        <h1>나츠미 게임센터</h1>
+        <p class="sub">Discord 계정으로 접속해서 금전, 랭크, 칭호, 배지, 미니게임, 가방과 도감을 한 화면에서 즐겨요.</p>
         <div class="quick-form">
-          <button id="loadBtn">내 프로필 불러오기</button>
+          <button id="loadBtn" type="button">내 프로필 불러오기</button>
         </div>
       </div>
-      <div class="mascot-card supporter-glow">
-        <div class="mascot">🦊</div>
-        <div class="speech">로그인만 하면 내가 알아서 찾아줄게. 흥.</div>
+      <div class="mascot-card supporter-glow arcade-sign">
+        <div class="mascot"><img src="./assets/natsumi-profile-03.jpg" alt="" /></div>
+        <div class="speech">코인을 넣고 직접 조작하는 픽셀 아케이드!</div>
       </div>
     </section>
 
     <section id="profileView" class="view active-view">
-      <div class="section-head"><p class="eyebrow">PROFILE</p><h2>내 게임 프로필</h2></div>
-      <div id="profileArea" class="empty">Discord 로그인 후 내 프로필 불러오기를 눌러줘.</div>
+      <div class="section-head">
+        <p class="eyebrow">PROFILE</p>
+        <h2>내 게임 프로필</h2>
+      </div>
+      <div id="verifyArea" class="support-card market-form"></div>
+      <div id="profileArea" class="empty">Discord 로그인 후 프로필을 불러와 주세요.</div>
     </section>
 
     <section id="gamesView" class="view">
-      <div class="section-head"><p class="eyebrow">GAMES</p><h2>게임 선택</h2></div>
+      <div class="section-head">
+        <p class="eyebrow">ARCADE</p>
+        <h2>게임센터</h2>
+      </div>
       <div class="game-console">
         <div class="game-list" id="gameList"></div>
         <div class="game-play">
-          <div class="game-art" id="gameArt">🎰</div>
-          <h3 id="gameTitle">슬롯머신</h3>
-          <p id="gameDesc">같은 그림을 맞춰 금전을 노려봐.</p>
-          <div class="bet-row"><input id="betInput" type="number" min="100" value="1000" /><button id="playGameBtn">게임 시작</button></div>
-          <div id="gameResult" class="result-box">게임 결과가 여기에 표시돼.</div>
+          <div class="game-marquee">
+            <span>INSERT COIN</span>
+            <span id="gameHint">게임을 고르고 코인을 넣어 주세요.</span>
+          </div>
+          <div class="game-stage" id="gameStage">
+            <div class="game-art" id="gameArt">777</div>
+          </div>
+          <h3 id="gameTitle">픽셀 슬롯</h3>
+          <p id="gameDesc">세 릴을 직접 멈춰 같은 문양을 맞춰 보세요.</p>
+          <div class="bet-row">
+            <input id="betInput" type="number" min="100" value="1000" inputmode="numeric" aria-label="베팅 금액" />
+            <button id="playGameBtn" type="button">코인 넣기</button>
+          </div>
+          <div id="gameResult" class="result-box hidden" aria-live="polite">게임 결과가 화면에 표시됩니다.</div>
         </div>
       </div>
     </section>
 
+    <section id="inventoryView" class="view">
+      <div class="section-head">
+        <p class="eyebrow">BAG & COLLECTION</p>
+        <h2>가방과 도감</h2>
+      </div>
+      <div class="shop-tabs arcade-tabs">
+        <button class="tab active" data-arcade-tab="bag" type="button">가방</button>
+        <button class="tab" data-arcade-tab="collection" type="button">도감</button>
+      </div>
+      <div id="inventoryArea" class="pixel-inventory">로그인 후 게임 기록을 불러올 수 있어요.</div>
+    </section>
+
     <section id="shopView" class="view">
-      <div class="section-head"><p class="eyebrow">SHOP</p><h2>칭호 & 뱃지 상점</h2></div>
-      <div class="shop-tabs"><button class="tab active" data-tab="titles">칭호</button><button class="tab" data-tab="badges">프로필 뱃지</button></div>
+      <div class="section-head">
+        <p class="eyebrow">SHOP</p>
+        <h2>칭호 & 배지 상점</h2>
+      </div>
+      <div class="shop-tabs">
+        <button class="tab active" data-tab="titles" type="button">칭호</button>
+        <button class="tab" data-tab="badges" type="button">배지</button>
+      </div>
       <div id="shopArea" class="cards"></div>
     </section>
 
-    <section id="supportView" class="view">
-      <div class="section-head"><p class="eyebrow">SUPPORTER</p><h2>후원자 전용 프로필</h2></div>
+    <section id="marketView" class="view">
+      <div class="section-head">
+        <p class="eyebrow">USER MARKET</p>
+        <h2>&#54028;&#51068; &#50629;&#47196;&#46300; &#49345;&#51216;</h2>
+      </div>
+      <form id="marketForm" class="market-form support-card">
+        <input id="marketName" type="text" maxlength="80" placeholder="&#49345;&#54408; &#51060;&#47492;" required />
+        <textarea id="marketDesc" maxlength="300" placeholder="&#49345;&#54408; &#49444;&#47749;"></textarea>
+        <div class="market-row">
+          <input id="marketPrice" type="number" min="100" max="10000000" value="1000" inputmode="numeric" aria-label="&#44032;&#44201;" />
+          <input id="marketQuantity" type="number" min="1" max="100" value="1" inputmode="numeric" aria-label="&#49688;&#47049;" />
+        </div>
+        <input id="marketFile" type="file" required />
+        <button type="submit">&#54028;&#51068; &#49345;&#54408; &#50732;&#47532;&#44592;</button>
+        <p class="market-note">1.5MB &#51060;&#54616; &#54028;&#51068;&#47564; &#50732;&#47540; &#49688; &#51080;&#44256;, &#49688;&#47049;&#51060; &#47784;&#46160; &#54036;&#47532;&#47732; &#51088;&#46041;&#51004;&#47196; &#45803;&#54784;&#50836;.</p>
+      </form>
+      <div class="shop-tabs">
+        <button class="tab active" id="marketAllBtn" type="button">&#54032;&#47588;&#51473;</button>
+        <button class="tab" id="marketMineBtn" type="button">&#45236; &#49345;&#54408;</button>
+      </div>
+      <div id="marketArea" class="cards">&#54028;&#51068; &#49345;&#51216;&#51012; &#48520;&#47084;&#50724;&#45716; &#51473;...</div>
+    </section>
+
+    <section id="xpShopView" class="view">
+      <div class="section-head">
+        <p class="eyebrow">XP SHOP</p>
+        <h2>경험치 상점</h2>
+      </div>
+      <div id="xpShopArea" class="cards">프로필을 불러오면 경험치로 살 수 있는 꾸미기 상품이 보여요.</div>
+    </section>
+
+    <section id="premiumView" class="view">
+      <div class="section-head">
+        <p class="eyebrow">PREMIUM</p>
+        <h2>프리미엄 기능</h2>
+      </div>
       <div class="support-grid">
-        <article class="support-card supporter-glow"><h3>💖 후원자 전용 기능</h3><p>후원 인증이 완료되면 사이트와 랭크카드에서 특별 표시를 사용할 수 있어.</p><ul><li>후원자 전용 프로필 프레임</li><li>후원자 전용 뱃지와 칭호</li><li>랭크카드 하단 후원자 표시</li><li>프로필 반짝임 효과</li><li>후원자 전용 상점 아이템</li></ul></article>
-        <article class="support-card"><h3>🧾 후원 인증 안내</h3><p>후원은 아래 카카오페이 링크 또는 계좌로 받을 수 있어. 입금 후 인증 신청을 남기면 운영자가 확인해서 후원자 효과를 지급하는 방식이야.</p><p><b>계좌:</b> 카카오페이증권 020-01-671227</p><p><a class="primary-link" href="https://qr.kakaopay.com/Fa7OA44AL" target="_blank" rel="noreferrer">카카오페이 송금 열기</a></p><div class="support-form"><input id="supportName" placeholder="입금자명 또는 후원 닉네임" /><input id="supportAmount" type="number" placeholder="후원 금액" /><textarea id="supportMemo" placeholder="남길 메시지"></textarea><button id="supportApplyBtn">후원 인증 신청</button></div><div id="supportResult" class="result-box">신청 내용은 운영자가 확인 후 후원자 효과를 지급하는 방식으로 쓰면 돼.</div></article>
+        <article class="support-card supporter-glow">
+          <h3>출석 역할</h3>
+          <p>서버 대시보드에서 출석 역할 보상을 지정하면 출석 기록에 맞춰 역할 보상을 줄 수 있어요.</p>
+        </article>
+        <article class="support-card supporter-glow">
+          <h3>커스텀 랭크카드</h3>
+          <p>경험치 상점에서 프레임과 반짝 효과를 산 뒤 랭크카드를 꾸밀 수 있게 준비했어요.</p>
+        </article>
+      </div>
+      <div id="premiumArea" class="cards"></div>
+    </section>
+
+    <section id="supportView" class="view">
+      <div class="section-head">
+        <p class="eyebrow">SUPPORTER</p>
+        <h2>후원 자판기</h2>
+      </div>
+      <div class="support-grid">
+        <article class="support-card supporter-glow">
+          <h3>후원 등급 선택</h3>
+          <p>금액을 고르면 등급이 자동 계산되고, 운영자 또는 봇 확인 후 칭호와 배지가 자동 지급돼요.</p>
+          <div id="supportTierList" class="support-tier-list"></div>
+        </article>
+        <article class="support-card">
+          <h3>후원 인증 안내</h3>
+          <p>후원 후 인증을 요청하면 확인 대기 상태로 저장되고, 실제 입금 확인 뒤 자동 지급됩니다.</p>
+          <p><a class="primary-link" href="https://qr.kakaopay.com/Fa7OA44AL" target="_blank" rel="noreferrer">카카오페이 송금 열기</a></p>
+          <p class="bank-account"><b>IBK기업은행</b> 08706196201017</p>
+          <div class="support-form">
+            <input id="supportName" placeholder="입금자명 또는 닉네임" />
+            <input id="supportAmount" type="number" placeholder="후원 금액" inputmode="numeric" />
+            <textarea id="supportMemo" placeholder="남길 메시지"></textarea>
+            <button id="supportApplyBtn" type="button">후원 인증 요청</button>
+          </div>
+          <div id="supportResult" class="result-box">신청 내용은 운영자 확인 후 반영됩니다.</div>
+        </article>
       </div>
     </section>
 
     <section id="rankView" class="view">
-      <div class="section-head"><p class="eyebrow">RANK CARD</p><h2>웹 랭크카드</h2></div>
-      <div class="rank-preview"><p>백엔드 API가 연결되어 있으면 랭크카드를 새 창에서 볼 수 있어.</p><a id="rankCardLink" class="primary-link" href="#profile" target="_blank">랭크카드 열기</a></div>
+      <div class="section-head">
+        <p class="eyebrow">RANK CARD</p>
+        <h2>랭크카드</h2>
+      </div>
+      <div class="rank-preview">
+        <p>프로필을 불러오면 랭크카드를 새 창에서 확인할 수 있어요.</p>
+        <a id="rankCardLink" class="primary-link" href="#profile" target="_blank" rel="noreferrer">랭크카드 열기</a>
+      </div>
     </section>
   </main>
 
-  <a id="donateLink" class="float-donate hidden" target="_blank" rel="noreferrer">💖 후원하기</a>
-  <script src="./config.js"></script><script src="./script.js"></script><script src="./extras.js"></script><script src="./interactive-games.js"></script><script src="./drawer-menu.js"></script>
+  <a id="donateLink" class="float-donate hidden" target="_blank" rel="noreferrer">후원하기</a>
+  <footer class="policy-footer">
+    <a href="/terms">이용약관</a>
+    <a href="/privacy">개인정보 처리방침</a>
+    <a href="/refund">환불정책</a>
+    <a href="/data-policy">데이터정책</a>
+  </footer>
+  <script src="./config.js?v=20260614-menu3"></script>
+  <script src="./script.js?v=20260614-menu3"></script>
+  <script src="./extras.js?v=20260614-menu3"></script>
+  <script src="./interactive-games.js?v=20260614-menu3"></script>
+  <script src="./drawer-menu.js?v=20260614-menu3"></script>
 </body>
 </html>

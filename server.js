@@ -18,13 +18,29 @@ const DEFAULT_GUILD_ID = process.env.DEFAULT_GUILD_ID || '';
 const DONATION_URL = process.env.DONATION_URL || '';
 const DONATION_ACCOUNT = process.env.DONATION_ACCOUNT || '';
 const DONATION_BANK_ACCOUNT = process.env.DONATION_BANK_ACCOUNT || 'IBK기업은행 08706196201017';
-const PUBLIC_BASE_URL = (process.env.PUBLIC_BASE_URL || 'http://natsumi-game.kro.kr').replace(/\/$/, '');
+const HTTP_PUBLIC_HOSTS = new Set([
+  'natsumidashboard.kro.kr',
+  'natsumi-game.kro.kr',
+  'api.natsumidashboard.kro.kr',
+  'api.natsumi-game.kro.kr',
+]);
+function normalizePublicServiceUrl(value, fallback) {
+  const raw = String(value || fallback).trim();
+  try {
+    const url = new URL(raw);
+    if (HTTP_PUBLIC_HOSTS.has(url.hostname)) url.protocol = 'http:';
+    return url.toString();
+  } catch {
+    return fallback;
+  }
+}
+const PUBLIC_BASE_URL = normalizePublicServiceUrl(process.env.PUBLIC_BASE_URL, 'http://natsumi-game.kro.kr').replace(/\/$/, '');
 const DISCORD_CLIENT_ID = process.env.DISCORD_CLIENT_ID || '';
 const DISCORD_CLIENT_SECRET = process.env.DISCORD_CLIENT_SECRET || '';
 const DISCORD_BOT_TOKEN = process.env.DISCORD_BOT_TOKEN || process.env.TOKEN || '';
 const DISCORD_REDIRECT_URI = process.env.DISCORD_REDIRECT_URI || `${PUBLIC_BASE_URL}/auth/discord/callback`;
 const OWNER_USER_ID = process.env.OWNER_USER_ID || process.env.NATSUMI_OWNER_ID || '1293232804745838733';
-const DASHBOARD_URL = process.env.DASHBOARD_URL || 'http://natsumidashboard.kro.kr/';
+const DASHBOARD_URL = normalizePublicServiceUrl(process.env.DASHBOARD_URL, 'http://natsumidashboard.kro.kr/');
 const SITE_URL = process.env.SITE_URL || PUBLIC_BASE_URL;
 const BOT_API_BASE_URL = process.env.BOT_API_BASE_URL || process.env.NATSUMI_BOT_API_BASE_URL || '';
 const KOREANBOTS_TOKEN = process.env.KOREANBOTS_TOKEN || '';
