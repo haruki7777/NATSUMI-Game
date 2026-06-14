@@ -145,14 +145,6 @@ app.use('/api', rateLimit(Number(process.env.API_RATE_LIMIT_MAX || RATE_LIMIT_MA
 app.use(express.json({ limit: process.env.MARKET_UPLOAD_LIMIT || '2mb' }));
 app.use(express.urlencoded({ extended: false, limit: process.env.MARKET_UPLOAD_LIMIT || '2mb' }));
 app.use((req, res, next) => {
-  const forceHttps = String(process.env.FORCE_HTTPS || '').toLowerCase() === 'true';
-  const forwardedProto = req.headers['x-forwarded-proto'];
-  if (forceHttps && forwardedProto && forwardedProto !== 'https') {
-    return res.redirect(301, `https://${req.headers.host}${req.originalUrl}`);
-  }
-  next();
-});
-app.use((req, res, next) => {
   const allowed = (process.env.ALLOWED_ORIGINS || process.env.ALLOWED_ORIGIN || `${DASHBOARD_URL},${SITE_URL},http://natsumi-game.kro.kr,http://natsumi-site.kro.kr,http://api.natsumidashboard.kro.kr`)
     .split(',')
     .map((origin) => origin.trim().replace(/\/$/, ''))

@@ -1,22 +1,18 @@
-{
-	email admin@natsumi-site.kro.kr
-}
-
-natsumidashboard.kro.kr, api.natsumidashboard.kro.kr {
+http://natsumidashboard.kro.kr, http://api.natsumidashboard.kro.kr {
 	encode zstd gzip
 	reverse_proxy 127.0.0.1:25901
 	header {
-		Strict-Transport-Security "max-age=31536000; includeSubDomains; preload"
+		-Strict-Transport-Security
 		X-Content-Type-Options "nosniff"
 		Referrer-Policy "strict-origin-when-cross-origin"
 	}
 }
 
-natsumi-game.kro.kr, api.natsumi-game.kro.kr {
+http://natsumi-game.kro.kr, http://api.natsumi-game.kro.kr {
 	encode zstd gzip
 	reverse_proxy 127.0.0.1:25772
 	header {
-		Strict-Transport-Security "max-age=31536000; includeSubDomains; preload"
+		-Strict-Transport-Security
 		X-Content-Type-Options "nosniff"
 		Referrer-Policy "strict-origin-when-cross-origin"
 	}

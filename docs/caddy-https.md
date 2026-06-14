@@ -69,6 +69,6 @@ DISCORD_REDIRECT_URI=http://natsumi-game.kro.kr/auth/discord/callback
 
 ## 주의
 
-- 앱 내부 `FORCE_HTTPS=true`는 Caddy HTTPS 접속이 실제로 성공한 뒤에만 켠다.
+- 현재 운영은 HTTP 유지 모드다. 앱 내부 `FORCE_HTTPS`는 사용하지 않는다.
 - Caddy가 HTTP -> HTTPS 리디렉션을 담당해야 OAuth 리디렉션과 세션이 덜 꼬인다.
 - 80/443 포트를 받을 수 없는 서버라면 Caddy 자동 TLS 대신 Cloudflare Tunnel로 전환한다.
