@@ -1,0 +1,156 @@
+:root {
+  --panel: rgba(18, 13, 24, .58);
+  --panel-strong: rgba(32, 22, 38, .64);
+  --topbar-bg: rgba(11, 7, 16, .54);
+  --soft-card: rgba(255, 255, 255, .18);
+}
+
+:root[data-theme="light"] {
+  --panel: rgba(255, 252, 254, .58);
+  --panel-strong: rgba(255, 245, 251, .66);
+  --topbar-bg: rgba(255, 249, 246, .58);
+  --soft-card: rgba(255, 255, 255, .46);
+}
+
+.topbar,
+.drawer-menu,
+.hero-card,
+.view,
+.rank-card,
+.game-console,
+.rank-preview,
+.support-card,
+.game-stage,
+.game-play,
+.pixel-inventory {
+  border-radius: 28px !important;
+  backdrop-filter: blur(18px) saturate(1.18) !important;
+  -webkit-backdrop-filter: blur(18px) saturate(1.18) !important;
+}
+
+.topbar,
+.drawer-menu,
+.hero-card,
+.view,
+.rank-preview,
+.support-card {
+  box-shadow: 0 22px 68px rgba(0, 0, 0, .26) !important;
+}
+
+.brand-mark,
+.mascot,
+.nav-btn,
+.ghost,
+.tab,
+.primary-link,
+.quick-form button,
+.bet-row button,
+#supportApplyBtn,
+.item button,
+.hamburger {
+  border-radius: 18px !important;
+  transition:
+    transform .18s ease,
+    box-shadow .18s ease,
+    border-color .18s ease,
+    background .18s ease,
+    opacity .18s ease;
+}
+
+.nav-btn:hover,
+.ghost:hover,
+.tab:hover,
+.primary-link:hover,
+.quick-form button:hover,
+.bet-row button:hover,
+#supportApplyBtn:hover,
+.item button:hover,
+.hamburger:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 14px 30px rgba(0, 0, 0, .22) !important;
+}
+
+.nav-btn:active,
+.ghost:active,
+.tab:active,
+.primary-link:active,
+.quick-form button:active,
+.bet-row button:active,
+#supportApplyBtn:active,
+.item button:active,
+.hamburger:active {
+  transform: translateY(1px) scale(.99);
+}
+
+.menu-backdrop {
+  z-index: 2147482990 !important;
+  background: rgba(8, 5, 12, .38) !important;
+  backdrop-filter: blur(3px);
+}
+
+.drawer-menu {
+  z-index: 2147483000 !important;
+  pointer-events: none;
+  border-radius: 28px 0 0 28px !important;
+}
+
+.drawer-menu.open {
+  pointer-events: auto;
+}
+
+.drawer-menu .nav-btn {
+  background: rgba(255, 255, 255, .12) !important;
+  color: var(--text) !important;
+}
+
+.drawer-menu .nav-btn.active {
+  background: linear-gradient(135deg, rgba(255, 138, 42, .9), rgba(255, 79, 163, .9)) !important;
+  color: #fff !important;
+}
+
+.topbar,
+#menuToggle,
+#menuClose {
+  z-index: 2147483004 !important;
+}
+
+.layout,
+.policy-footer,
+.hero-card,
+.view,
+.arcade-hero {
+  position: relative;
+  z-index: 1;
+}
+
+body.menu-open .layout,
+body.menu-open .policy-footer,
+body.menu-open .hero-card,
+body.menu-open .view,
+body.menu-open .arcade-hero {
+  pointer-events: none;
+}
+
+body.menu-open #drawerMenu,
+body.menu-open #drawerMenu *,
+body.menu-open #menuBackdrop,
+body.menu-open #menuToggle,
+body.menu-open #menuClose {
+  pointer-events: auto;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .brand-mark,
+  .mascot,
+  .nav-btn,
+  .ghost,
+  .tab,
+  .primary-link,
+  .quick-form button,
+  .bet-row button,
+  #supportApplyBtn,
+  .item button,
+  .hamburger {
+    transition: none;
+  }
+}

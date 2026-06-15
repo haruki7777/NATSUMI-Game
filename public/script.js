@@ -79,6 +79,7 @@ function getConfig() {
     donationAccount: config.DONATION_ACCOUNT || "",
     donationBankAccount: config.DONATION_BANK_ACCOUNT || "IBK기업은행 08706196201017",
     donationEnabled: Boolean(config.DONATION_URL),
+    dashboardUrl: config.DASHBOARD_URL || "https://natsumi-dashboard-proxy.necoharuki.workers.dev/",
     discordLoginEnabled: false,
     supportTiers: fallbackSupportTiers
   };
@@ -103,6 +104,7 @@ async function loadServerConfig(baseConfig) {
       donationAccount: serverConfig.donationAccount || baseConfig.donationAccount,
       donationBankAccount: serverConfig.donationBankAccount || baseConfig.donationBankAccount,
       donationEnabled: Boolean(serverConfig.donationEnabled || baseConfig.donationUrl),
+      dashboardUrl: serverConfig.dashboardUrl || baseConfig.dashboardUrl || "https://natsumi-dashboard-proxy.necoharuki.workers.dev/",
       discordLoginEnabled: Boolean(serverConfig.discordLoginEnabled),
       publicBaseUrl: serverConfig.publicBaseUrl || "",
       discordRedirectUri: serverConfig.discordRedirectUri || "",
@@ -960,6 +962,9 @@ function preventRapidGameTapZoom() {
 function bindUiEvents() {
   if (window.__natsumiUiBound) return;
   window.__natsumiUiBound = true;
+  document.querySelectorAll('a.nav-btn[href*="natsumidashboard"]').forEach((link) => {
+    link.href = state.config.dashboardUrl || "https://natsumi-dashboard-proxy.necoharuki.workers.dev/";
+  });
   preventRapidGameTapZoom();
   $("#loadBtn")?.addEventListener("click", loadProfile);
   $("#playGameBtn")?.addEventListener("click", playGame);

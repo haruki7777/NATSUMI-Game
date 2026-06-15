@@ -38,13 +38,13 @@ function normalizePublicServiceUrl(value, fallback) {
     return fallback;
   }
 }
-const PUBLIC_BASE_URL = normalizePublicServiceUrl(process.env.PUBLIC_BASE_URL, 'http://natsumi-game.kro.kr').replace(/\/$/, '');
+const PUBLIC_BASE_URL = normalizePublicServiceUrl(process.env.PUBLIC_BASE_URL, 'https://natsumi-game-proxy.necoharuki.workers.dev').replace(/\/$/, '');
 const DISCORD_CLIENT_ID = process.env.DISCORD_CLIENT_ID || '';
 const DISCORD_CLIENT_SECRET = process.env.DISCORD_CLIENT_SECRET || '';
 const DISCORD_BOT_TOKEN = process.env.DISCORD_BOT_TOKEN || process.env.TOKEN || '';
 const DISCORD_REDIRECT_URI = process.env.DISCORD_REDIRECT_URI || `${PUBLIC_BASE_URL}/auth/discord/callback`;
 const OWNER_USER_ID = process.env.OWNER_USER_ID || process.env.NATSUMI_OWNER_ID || '1293232804745838733';
-const DASHBOARD_URL = normalizePublicServiceUrl(process.env.DASHBOARD_URL, 'http://natsumidashboard.kro.kr/');
+const DASHBOARD_URL = normalizePublicServiceUrl(process.env.DASHBOARD_URL, 'https://natsumi-dashboard-proxy.necoharuki.workers.dev/');
 const SITE_URL = process.env.SITE_URL || PUBLIC_BASE_URL;
 const BOT_API_BASE_URL = process.env.BOT_API_BASE_URL || process.env.NATSUMI_BOT_API_BASE_URL || '';
 const KOREANBOTS_TOKEN = process.env.KOREANBOTS_TOKEN || '';
@@ -149,7 +149,7 @@ app.use('/api', rateLimit(Number(process.env.API_RATE_LIMIT_MAX || RATE_LIMIT_MA
 app.use(express.json({ limit: process.env.MARKET_UPLOAD_LIMIT || '2mb' }));
 app.use(express.urlencoded({ extended: false, limit: process.env.MARKET_UPLOAD_LIMIT || '2mb' }));
 app.use((req, res, next) => {
-  const allowed = (process.env.ALLOWED_ORIGINS || process.env.ALLOWED_ORIGIN || `${DASHBOARD_URL},${SITE_URL},http://natsumi-game.kro.kr,http://natsumi-site.kro.kr,http://api.natsumidashboard.kro.kr`)
+  const allowed = (process.env.ALLOWED_ORIGINS || process.env.ALLOWED_ORIGIN || `${DASHBOARD_URL},${SITE_URL},http://natsumi-game.kro.kr,http://natsumi-site.kro.kr,http://api.natsumidashboard.kro.kr,https://natsumi-game-proxy.necoharuki.workers.dev,https://natsumi-dashboard-proxy.necoharuki.workers.dev`)
     .split(',')
     .map((origin) => origin.trim().replace(/\/$/, ''))
     .filter(Boolean);
@@ -786,12 +786,14 @@ async function getProfile(guildId, userId) {
 function publicBaseUrl(req) {
   if (process.env.PUBLIC_BASE_URL) return process.env.PUBLIC_BASE_URL.replace(/\/$/, '');
   const proto = req.headers['x-forwarded-proto'] || req.protocol || 'http';
-  return `${proto}://${req.headers.host}`.replace(/\/$/, '');
+  const host = req.headers['x-forwarded-host'] || req.headers.host;
+  return `${proto}://${host}`.replace(/\/$/, '');
 }
 
 function requestBaseUrl(req) {
   const proto = req.headers['x-forwarded-proto'] || req.protocol || 'http';
-  return `${proto}://${req.headers.host}`.replace(/\/$/, '');
+  const host = req.headers['x-forwarded-host'] || req.headers.host;
+  return `${proto}://${host}`.replace(/\/$/, '');
 }
 
 function startDiscordAuth(req, res, returnTo, redirectUri) {
